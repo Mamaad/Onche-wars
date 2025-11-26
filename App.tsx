@@ -700,7 +700,7 @@ const App = () => {
       <div className="fixed top-4 right-4 z-[60] flex gap-2">
          {/* Skin Selector */}
          <select 
-            value={currentUser.theme} 
+            value={currentUser.theme || 'default'} 
             onChange={(e) => {
                 const u = {...currentUser, theme: e.target.value as any};
                 setCurrentUser(u);

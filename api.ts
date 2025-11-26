@@ -141,6 +141,7 @@ export const api = {
             // Migration check for new props
             if (!user.talents) user.talents = JSON.parse(JSON.stringify(TALENT_TREE));
             if (!user.inventory) user.inventory = [];
+            if (!user.theme) user.theme = 'default'; // THEME MIGRATION
             
             localStorage.setItem(SESSION_KEY, user.id);
             return { success: true, user };
