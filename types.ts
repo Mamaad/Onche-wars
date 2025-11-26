@@ -7,10 +7,10 @@ export interface Resources {
   sel: number;
   karma: number;
   karmaMax: number;
-  redpills: number; // Global resource usually, but kept here for simplicity
-  maxRis?: number; // UI helper
-  maxSti?: number; // UI helper
-  maxSel?: number; // UI helper
+  redpills: number; 
+  maxRis?: number; 
+  maxSti?: number; 
+  maxSel?: number; 
 }
 
 export interface Cost {
@@ -20,7 +20,7 @@ export interface Cost {
 }
 
 export interface Requirement {
-  [key: string]: number; // id: level
+  [key: string]: number; 
 }
 
 export interface Entity {
@@ -33,9 +33,8 @@ export interface Entity {
   basePoints: number;
   reqs?: Requirement;
   image?: string;
-  // New Time Calculation props
-  baseTime?: number; // Seconds for Level 1
-  timeFactor?: number; // Multiplier per level
+  baseTime?: number; 
+  timeFactor?: number; 
 }
 
 export interface Building extends Entity {
@@ -44,7 +43,8 @@ export interface Building extends Entity {
   consumption?: { type: ResourceType; base: number; factor: number };
   energyType?: 'consumer' | 'producer';
   reqsArray?: string[];
-  percentage: number; // 0 to 100
+  percentage: number; 
+  isMoonOnly?: boolean; // NEW: For Moon buildings
 }
 
 export interface Research extends Entity {
@@ -58,7 +58,7 @@ export interface Ship extends Entity {
     defense: number;
     hull: number;
     capacity: number;
-    rapidFire?: { [targetId: string]: number }; // NOUVEAU: RapidFire
+    rapidFire?: { [targetId: string]: number }; 
   }
 }
 
@@ -73,6 +73,30 @@ export interface Officer {
   bonus: string;
   active: boolean;
   image?: string;
+}
+
+// NEW: Commander Talents
+export interface Talent {
+    id: string;
+    name: string;
+    description: string;
+    branch: 'raider' | 'miner' | 'strategist';
+    tier: number; // 1, 2, 3
+    maxLevel: number;
+    currentLevel: number;
+    reqs?: { [talentId: string]: number };
+    effect: (val: number) => string; 
+}
+
+// NEW: Artifacts
+export interface Artifact {
+    id: string;
+    name: string;
+    description: string;
+    rarity: 'common' | 'rare' | 'legendary';
+    effectType: 'resource' | 'speed' | 'combat';
+    quantity: number;
+    image?: string;
 }
 
 export interface ConstructionItem {
@@ -90,14 +114,13 @@ export interface FleetMission {
   id: string;
   type: MissionType;
   fleet: { [shipId: string]: number };
-  source: string; // Planet Name or Coords
-  target: string; // coords "g:s:p"
+  source: string; 
+  target: string; 
   startTime: number;
   arrivalTime: number;
   resources?: { risitasium: number; stickers: number; sel: number };
 }
 
-// COMBAT LOGS
 export interface CombatRound {
     round: number;
     attackerCount: { [id: string]: number };
@@ -116,13 +139,13 @@ export interface DetailedCombatReport {
 
 export interface Report {
   id: string;
-  type: 'combat' | 'spy' | 'expedition' | 'colonize' | 'recycle' | 'missile' | 'transport';
+  type: 'combat' | 'spy' | 'expedition' | 'colonize' | 'recycle' | 'missile' | 'transport' | 'war';
   title: string;
   content: string;
   date: number;
   read: boolean;
   loot?: Resources;
-  detailedCombat?: DetailedCombatReport; // Detailed object
+  detailedCombat?: DetailedCombatReport; 
 }
 
 export interface PointsBreakdown {
@@ -140,12 +163,13 @@ export interface Planet {
     coords: { g: number; s: number; p: number };
     resources: Resources;
     buildings: Building[];
-    fleet: Ship[]; // Fleet is stationed on a planet
+    fleet: Ship[]; 
     defenses: Defense[];
     queue: ConstructionItem[];
     lastUpdate: number;
-    temperature: { min: number, max: number }; // NEW
-    fields: { current: number, max: number }; // NEW
+    temperature: { min: number, max: number }; 
+    fields: { current: number, max: number }; 
+    isMoon: boolean; // NEW
 }
 
 export interface Quest {
@@ -164,19 +188,24 @@ export interface User {
   allianceId?: string;
   points: PointsBreakdown;
   
-  // Global Techs & Officers
   research: Research[];
   officers: Officer[];
   
-  // Planets Management
+  // NEW: RPG Elements
+  commanderLevel: number;
+  commanderXp: number;
+  skillPoints: number;
+  talents: Talent[];
+  inventory: Artifact[];
+  theme: 'default' | 'retro' | 'neon'; 
+
   planets: Planet[];
-  currentPlanetId: string; // ID of the planet currently being viewed/managed
+  currentPlanetId: string; 
 
   missions: FleetMission[];
   reports: Report[];
   lastUpdate?: number;
   
-  // New States
   vacationMode: boolean;
   vacationModeUntil?: number;
   completedQuests: string[];
@@ -193,6 +222,19 @@ export interface AllianceApplication {
     date: number;
 }
 
+// NEW: War System
+export interface War {
+    id: string;
+    attackerId: string; // Alliance ID
+    defenderId: string; // Alliance ID
+    attackerName: string;
+    defenderName: string;
+    startDate: number;
+    status: 'pending' | 'active' | 'finished';
+    scoreAttacker: number;
+    scoreDefender: number;
+}
+
 export interface Alliance {
   id: string;
   tag: string;
@@ -202,21 +244,31 @@ export interface Alliance {
   description: string;
   creationDate: number;
   points: number;
-  
-  // New properties
   image?: string;
   recruitment: AllianceRecruitmentState;
   applications: AllianceApplication[];
+  wars: War[]; // NEW
 }
 
 export interface TradeOffer {
     id: string;
     sellerId: string;
     sellerName: string;
-    type: 'sell' | 'buy'; // Seller wants to sell or buy? (Simplification: Seller SELLS resource A for resource B)
+    type: 'sell' | 'buy'; 
     offeredResource: ResourceType;
     offeredAmount: number;
     requestedResource: ResourceType;
     requestedAmount: number;
     date: number;
+}
+
+// NEW: Chat
+export interface ChatMessage {
+    id: string;
+    sender: string;
+    senderId: string;
+    channel: 'global' | 'alliance' | 'trade';
+    content: string;
+    timestamp: number;
+    allianceTag?: string;
 }

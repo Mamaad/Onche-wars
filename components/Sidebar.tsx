@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull, LucideChevronDown, LucideSettings2 } from 'lucide-react';
+import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull, LucideChevronDown, LucideSettings2, LucideMedal } from 'lucide-react';
 import { TechCard } from './TechCard';
 import { Building, ConstructionItem, User } from '../types';
 import { formatTime } from '../utils';
@@ -37,7 +37,8 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
     { id: 'galaxy', label: 'GALAXIE', icon: <LucideGlobe />, visible: true },
     { id: 'alliance', label: 'ALLIANCE', icon: <LucideHandshake />, visible: true },
     { id: 'officers', label: 'OFFICIERS', icon: <LucideUser />, visible: true },
-    { id: 'merchant', label: 'COMMERCE', icon: <LucideBriefcase />, visible: true }, // Renamed
+    { id: 'commander', label: 'COMMANDANT', icon: <LucideMedal />, visible: true }, // NEW
+    { id: 'merchant', label: 'COMMERCE', icon: <LucideBriefcase />, visible: true }, 
     { id: 'highscore', label: 'CLASSEMENT', icon: <LucideTrophy />, visible: true },
     { id: 'techtree', label: 'ARBRE TECH', icon: <LucideNetwork />, visible: true },
     { id: 'resources', label: 'RÉCAPITULATIF', icon: <LucideSettings2 />, visible: true },
@@ -119,7 +120,7 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
                  >
                      {user.planets.map(p => (
                          <option key={p.id} value={p.id}>
-                             {p.name} [{p.coords.g}:{p.coords.s}:{p.coords.p}]
+                             {p.isMoon ? '🌙 ' : '🪐 '} {p.name} [{p.coords.g}:{p.coords.s}:{p.coords.p}]
                          </option>
                      ))}
                  </select>
@@ -127,7 +128,7 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
              </div>
 
              <div className="w-24 h-24 bg-gradient-to-br from-slate-800 to-black rounded-full mx-auto mb-3 flex items-center justify-center border-2 border-slate-700 shadow-xl overflow-hidden group">
-               <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🪐</span>
+               <span className="text-5xl group-hover:scale-110 transition-transform duration-500">{currentPlanet.isMoon ? '🌙' : '🪐'}</span>
              </div>
              <p className="text-tech-blue font-mono text-sm tracking-wider">[{currentPlanet.coords.g}:{currentPlanet.coords.s}:{currentPlanet.coords.p}]</p>
           </div>

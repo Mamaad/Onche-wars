@@ -1,6 +1,6 @@
 
-import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Alliance, Planet, AllianceRecruitmentState, AllianceApplication, TradeOffer } from './types';
-import { INITIAL_RESOURCES, BUILDING_DB, RESEARCH_DB, SHIP_DB, DEFENSE_DB, OFFICER_DB } from './constants';
+import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Alliance, Planet, AllianceRecruitmentState, AllianceApplication, TradeOffer, ChatMessage, War, Talent, Artifact } from './types';
+import { INITIAL_RESOURCES, BUILDING_DB, RESEARCH_DB, SHIP_DB, DEFENSE_DB, OFFICER_DB, TALENT_TREE, ARTIFACT_DB } from './constants';
 import { calculateUserPoints } from './utils';
 
 // SIMULATION D'UN BACKEND API VIA LOCALSTORAGE
@@ -8,7 +8,8 @@ import { calculateUserPoints } from './utils';
 const DB_KEY = 'onche_wars_db_users';
 const ALLIANCE_KEY = 'onche_wars_db_alliances';
 const GALAXY_KEY = 'onche_wars_db_galaxy';
-const MARKET_KEY = 'onche_wars_db_market'; // NEW
+const MARKET_KEY = 'onche_wars_db_market'; 
+const CHAT_KEY = 'onche_wars_db_chat'; // NEW
 const SESSION_KEY = 'onche_wars_session';
 
 const getDB = (): User[] => {
@@ -40,7 +41,6 @@ export const saveGalaxyDB = (data: any) => {
 
 const getMarketDB = (): TradeOffer[] => {
     const data = localStorage.getItem(MARKET_KEY);
-    // MOCK DATA IF EMPTY
     if (!data || JSON.parse(data).length === 0) {
         const mocks: TradeOffer[] = [
             { id: 'm1', sellerId: 'ai_1', sellerName: 'Marchand_IA', type: 'sell', offeredResource: 'risitasium', offeredAmount: 5000, requestedResource: 'stickers', requestedAmount: 2500, date: Date.now() },
@@ -56,8 +56,17 @@ const saveMarketDB = (offers: TradeOffer[]) => {
     localStorage.setItem(MARKET_KEY, JSON.stringify(offers));
 };
 
+const getChatDB = (): ChatMessage[] => {
+    const data = localStorage.getItem(CHAT_KEY);
+    return data ? JSON.parse(data) : [];
+};
+
+const saveChatDB = (messages: ChatMessage[]) => {
+    localStorage.setItem(CHAT_KEY, JSON.stringify(messages));
+};
+
 // --- PLANET GENERATION LOGIC ---
-const createPlanet = (id: string, name: string, g: number, s: number, p: number): Planet => {
+const createPlanet = (id: string, name: string, g: number, s: number, p: number, isMoon: boolean = false): Planet => {
     const baseTemp = 140 - (p * 10);
     const variation = Math.floor(Math.random() * 40) - 20;
     const maxTemp = baseTemp + variation;
@@ -65,26 +74,29 @@ const createPlanet = (id: string, name: string, g: number, s: number, p: number)
 
     let baseFields = 163;
     if (p <= 3 || p >= 13) baseFields = 100;
+    if (isMoon) baseFields = 15; // Moons start small
+    
     const fields = Math.floor(baseFields + (Math.random() * 60) - 20);
 
     return {
         id,
         name,
         coords: { g, s, p },
-        resources: { ...INITIAL_RESOURCES, redpills: 0 }, 
+        resources: isMoon ? { risitasium: 0, stickers: 0, sel: 0, karma: 0, karmaMax: 0, redpills: 0 } : { ...INITIAL_RESOURCES, redpills: 0 }, 
         buildings: JSON.parse(JSON.stringify(BUILDING_DB)),
         fleet: JSON.parse(JSON.stringify(SHIP_DB)),
         defenses: JSON.parse(JSON.stringify(DEFENSE_DB)),
         queue: [],
         lastUpdate: Date.now(),
         temperature: { min: minTemp, max: maxTemp },
-        fields: { current: 0, max: fields }
+        fields: { current: 0, max: fields },
+        isMoon
     };
 };
 
 const createInitialUser = (username: string, email?: string): User => {
     const planetId = 'p-' + Date.now();
-    const planet = createPlanet(planetId, 'Colonie', 1, 42, 6); // Pos 6 is balanced
+    const planet = createPlanet(planetId, 'Colonie', 1, 42, 6); 
     
     return {
         id: Date.now().toString(),
@@ -100,7 +112,13 @@ const createInitialUser = (username: string, email?: string): User => {
         reports: [],
         lastUpdate: Date.now(),
         vacationMode: false,
-        completedQuests: []
+        completedQuests: [],
+        commanderLevel: 1,
+        commanderXp: 0,
+        skillPoints: 0,
+        talents: JSON.parse(JSON.stringify(TALENT_TREE)),
+        inventory: [],
+        theme: 'default'
     }
 };
 
@@ -111,7 +129,6 @@ export const api = {
         const users = getDB();
         const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
         if (user) {
-            // MIGRATION HELPER
             const legacyUser = user as any;
             if (!user.planets || user.planets.length === 0) {
                  user.planets = [createPlanet('p-'+user.id, legacyUser.planetName || 'Colonie', 1, 42, 6)];
@@ -121,6 +138,9 @@ export const api = {
                  if (legacyUser.defenses) user.planets[0].defenses = legacyUser.defenses;
                  user.currentPlanetId = user.planets[0].id;
             }
+            // Migration check for new props
+            if (!user.talents) user.talents = JSON.parse(JSON.stringify(TALENT_TREE));
+            if (!user.inventory) user.inventory = [];
             
             localStorage.setItem(SESSION_KEY, user.id);
             return { success: true, user };
@@ -158,9 +178,26 @@ export const api = {
         const index = users.findIndex(u => u.id === user.id);
         if (index !== -1) {
             user.planets.forEach(p => {
+                // Add terraformer bonus
+                const terraformer = p.buildings.find(b => b.id === 'terraformeur')?.level || 0;
+                const moonBase = p.buildings.find(b => b.id === 'base_lunaire')?.level || 0;
+                let baseMax = p.isMoon ? 15 : (163 + (Math.random() * 20)); // Simplified
+                if(p.isMoon) baseMax = 15 + (moonBase * 3);
+                else baseMax = baseMax + (terraformer * 5);
+                
                 p.fields.current = p.buildings.reduce((acc, b) => acc + b.level, 0);
+                p.fields.max = Math.floor(baseMax);
             });
             const points = calculateUserPoints(user);
+            
+            // Check Commander Level Up
+            const nextLevelXp = user.commanderLevel * 1000;
+            if (user.commanderXp >= nextLevelXp) {
+                user.commanderLevel++;
+                user.commanderXp -= nextLevelXp;
+                user.skillPoints += 1;
+            }
+
             users[index] = { ...user, points, lastUpdate: Date.now() };
             saveDB(users);
             
@@ -223,6 +260,15 @@ export const api = {
         if (!defender) return { allowed: true };
 
         if (defender.vacationMode) return { allowed: false, reason: "Mode Vacances actif." };
+        
+        // Check Alliance War
+        if (attacker.allianceId && defender.allianceId) {
+            const alliances = getAlliancesDB();
+            const attAlly = alliances.find(a => a.id === attacker.allianceId);
+            const war = attAlly?.wars?.find(w => w.status === 'active' && (w.attackerId === defender.allianceId || w.defenderId === defender.allianceId));
+            if (war) return { allowed: true }; // WAR OVERRIDES BASHING
+        }
+
         if (attacker.isAdmin) return { allowed: true };
 
         const ratio = attacker.points.total / Math.max(1, defender.points.total);
@@ -239,6 +285,7 @@ export const api = {
     scanPhalanx: async (user: User, targetCoords: string): Promise<{success: boolean, missions?: FleetMission[], error?: string}> => {
         const currentP = user.planets.find(p => p.id === user.currentPlanetId);
         if (!currentP) return { success: false, error: "Planète erreur" };
+        if (!currentP.isMoon) return { success: false, error: "La phalange ne peut être utilisée que sur une Lune." };
         
         const phalanx = currentP.buildings.find(b => b.id === 'phalange_capteur');
         if (!phalanx || phalanx.level === 0) return { success: false, error: "Pas de Phalange de Capteur." };
@@ -380,7 +427,8 @@ export const api = {
             creationDate: Date.now(),
             points: freshFounder.points.total,
             recruitment: 'open',
-            applications: []
+            applications: [],
+            wars: [] // NEW
         };
 
         alliances.push(newAlly);
@@ -500,6 +548,150 @@ export const api = {
             saveDB(users);
         }
         return { success: true };
+    },
+
+    // --- WAR SYSTEM ---
+    declareWar: async (attackerAllyId: string, defenderAllyId: string): Promise<{ success: boolean, error?: string }> => {
+        const alliances = getAlliancesDB();
+        const attIdx = alliances.findIndex(a => a.id === attackerAllyId);
+        const defIdx = alliances.findIndex(a => a.id === defenderAllyId);
+
+        if (attIdx === -1 || defIdx === -1) return { success: false, error: "Alliance introuvable" };
+        if (attackerAllyId === defenderAllyId) return { success: false, error: "Impossible de se déclarer la guerre." };
+
+        const newWar: War = {
+            id: Date.now().toString(),
+            attackerId: attackerAllyId,
+            defenderId: defenderAllyId,
+            attackerName: alliances[attIdx].name,
+            defenderName: alliances[defIdx].name,
+            startDate: Date.now(),
+            status: 'pending',
+            scoreAttacker: 0,
+            scoreDefender: 0
+        };
+
+        if (!alliances[attIdx].wars) alliances[attIdx].wars = [];
+        if (!alliances[defIdx].wars) alliances[defIdx].wars = [];
+
+        alliances[attIdx].wars.push(newWar);
+        alliances[defIdx].wars.push(newWar); // Shared object in local storage simulation needs care, simplified here by duplicating
+
+        saveAlliancesDB(alliances);
+
+        // Send mail to defender leader
+        const users = getDB();
+        const defLeader = users.find(u => u.id === alliances[defIdx].founderId);
+        if (defLeader) {
+            defLeader.reports.unshift({
+                id: Date.now() + '_war',
+                type: 'war',
+                title: 'DÉCLARATION DE GUERRE',
+                content: `L'alliance ${alliances[attIdx].name} [${alliances[attIdx].tag}] vous a déclaré la guerre. Vous devez accepter ou refuser dans le menu Alliance.`,
+                date: Date.now(),
+                read: false
+            });
+            saveDB(users);
+        }
+
+        return { success: true };
+    },
+
+    manageWar: async (allyId: string, warId: string, accept: boolean): Promise<{success: boolean}> => {
+        const alliances = getAlliancesDB();
+        
+        // Update all alliances having this war (simulation limitation fix)
+        const updatedAlliances = alliances.map(a => {
+            if (a.wars) {
+                const warIdx = a.wars.findIndex(w => w.id === warId);
+                if (warIdx !== -1) {
+                    if (accept) {
+                        a.wars[warIdx].status = 'active';
+                        a.wars[warIdx].startDate = Date.now();
+                    } else {
+                        a.wars.splice(warIdx, 1); // Remove pending war
+                    }
+                }
+            }
+            return a;
+        });
+        
+        saveAlliancesDB(updatedAlliances);
+        return { success: true };
+    },
+
+    // --- CHAT SYSTEM ---
+    sendMessage: async (user: User, channel: 'global' | 'alliance' | 'trade', content: string): Promise<void> => {
+        const msgs = getChatDB();
+        const ally = user.allianceId ? (getAlliancesDB().find(a => a.id === user.allianceId)?.tag || '') : '';
+        
+        msgs.push({
+            id: Date.now().toString(),
+            sender: user.username,
+            senderId: user.id,
+            channel,
+            content: content.substring(0, 200), // Limit length
+            timestamp: Date.now(),
+            allianceTag: ally
+        });
+        
+        // Keep last 100 messages
+        if (msgs.length > 100) msgs.shift();
+        saveChatDB(msgs);
+    },
+
+    getMessages: async (): Promise<ChatMessage[]> => {
+        return getChatDB();
+    },
+
+    // --- TALENTS ---
+    learnTalent: async (user: User, talentId: string): Promise<{success: boolean, error?: string}> => {
+        if (user.skillPoints <= 0) return { success: false, error: "Pas de points de compétence." };
+        
+        const talent = user.talents.find(t => t.id === talentId);
+        if (!talent) return { success: false, error: "Talent introuvable." };
+        if (talent.currentLevel >= talent.maxLevel) return { success: false, error: "Niveau max atteint." };
+
+        // Check Reqs
+        if (talent.reqs) {
+            const reqsMet = Object.entries(talent.reqs).every(([reqId, lvl]) => {
+                const t = user.talents.find(x => x.id === reqId);
+                return t && t.currentLevel >= lvl;
+            });
+            if (!reqsMet) return { success: false, error: "Prérequis non remplis." };
+        }
+
+        talent.currentLevel++;
+        user.skillPoints--;
+        
+        await api.saveGameState(user);
+        return { success: true };
+    },
+
+    // --- SCRAPYARD ---
+    scrapShips: async (user: User, shipId: string, count: number): Promise<{success: boolean, resources?: Resources}> => {
+        const planet = user.planets.find(p => p.id === user.currentPlanetId);
+        if (!planet) return { success: false };
+        
+        const ship = planet.fleet.find(s => s.id === shipId);
+        if (!ship || ship.count < count) return { success: false };
+
+        // Remove ships
+        ship.count -= count;
+
+        // Calculate refund (50%)
+        const dbShip = SHIP_DB.find(s => s.id === shipId)!;
+        const refundRis = (dbShip.baseCost.risitasium * count) * 0.5;
+        const refundSti = (dbShip.baseCost.stickers * count) * 0.5;
+        const refundSel = (dbShip.baseCost.sel * count) * 0.5;
+
+        planet.resources.risitasium += refundRis;
+        planet.resources.stickers += refundSti;
+        planet.resources.sel += refundSel;
+
+        await api.saveGameState(user);
+        
+        return { success: true, resources: { risitasium: refundRis, stickers: refundSti, sel: refundSel, karma:0, karmaMax:0, redpills:0 }};
     },
 
     getHighscores: async (): Promise<User[]> => {

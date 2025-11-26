@@ -1,5 +1,5 @@
 
-import { Building, Resources, Research, Ship, Defense, Officer, Quest, User } from './types';
+import { Building, Resources, Research, Ship, Defense, Officer, Quest, User, Talent, Artifact } from './types';
 
 export const INITIAL_RESOURCES: Resources = {
   risitasium: 500,
@@ -10,7 +10,6 @@ export const INITIAL_RESOURCES: Resources = {
   redpills: 50,
 };
 
-// RAPID FIRE MATRIX (Attacker -> Target: Probability/Count)
 export const RAPID_FIRE: { [attackerId: string]: { [targetId: string]: number } } = {
     'croiseur': { 'chasseur_leger': 6, 'sonde': 5, 'satellite_solaire': 5 },
     'destructeur': { 'croiseur': 2, 'laser_gneugneu': 5, 'satellite_solaire': 5 },
@@ -77,6 +76,19 @@ export const OFFICER_DB: Officer[] = [
     active: false,
     image: 'https://images.unsplash.com/photo-1614726365723-49faaa559036?q=80&w=500&auto=format&fit=crop'
   }
+];
+
+// NEW: Talents
+export const TALENT_TREE: Talent[] = [
+    { id: 't_raid_speed', name: 'Postcombustion', description: 'Augmente la vitesse de la flotte.', branch: 'raider', tier: 1, maxLevel: 5, currentLevel: 0, effect: (v) => `+${v*2}% Vitesse` },
+    { id: 't_mine_boost', name: 'Optimisation', description: 'Augmente la production des mines.', branch: 'miner', tier: 1, maxLevel: 5, currentLevel: 0, effect: (v) => `+${v*2}% Production` },
+    { id: 't_spy_tech', name: 'Cryptographie', description: 'Améliore la technologie d\'espionnage.', branch: 'strategist', tier: 1, maxLevel: 3, currentLevel: 0, effect: (v) => `+${v} Niv Espionnage` },
+];
+
+// NEW: Artifacts
+export const ARTIFACT_DB: Artifact[] = [
+    { id: 'art_warp_core', name: 'Noyau Instable', description: 'Un coeur de réacteur antique.', rarity: 'legendary', effectType: 'speed', quantity: 0, image: 'https://images.unsplash.com/photo-1618557219685-b98c3b3c473e?q=80&w=100' },
+    { id: 'art_ancient_map', name: 'Carte Stellaire', description: 'Coordonnées de secteurs riches.', rarity: 'rare', effectType: 'resource', quantity: 0, image: 'https://images.unsplash.com/photo-1465101162946-4377e57745c3?q=80&w=100' },
 ];
 
 export const DEFENSE_DB: Defense[] = [
@@ -176,8 +188,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 60, stickers: 15, sel: 0 },
     costFactor: 1.5,
     basePoints: 1,
-    baseTime: 10, // Starts fast
-    timeFactor: 1.6, // Scales fast
+    baseTime: 10, 
+    timeFactor: 1.6, 
     production: { type: 'risitasium', base: 30, factor: 1.1 },
     energyType: 'consumer',
     consumption: { type: 'karma', base: 10, factor: 1.1 },
@@ -212,7 +224,7 @@ export const BUILDING_DB: Building[] = [
     basePoints: 3,
     baseTime: 15,
     timeFactor: 1.6,
-    production: { type: 'sel', base: 8, factor: 1.1 }, // Lower base production to make it harder (Stickers is 20)
+    production: { type: 'sel', base: 8, factor: 1.1 }, 
     energyType: 'consumer',
     consumption: { type: 'karma', base: 20, factor: 1.1 },
     image: 'https://images.unsplash.com/photo-1518337231011-7b24300e84b6?q=80&w=500&auto=format&fit=crop',
@@ -305,8 +317,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 400, stickers: 120, sel: 200 },
     costFactor: 2,
     basePoints: 10,
-    baseTime: 150, // 2min 30s (Divided by 2 from original 5min)
-    timeFactor: 1.65, // Reverted to original curve
+    baseTime: 150, 
+    timeFactor: 1.65, 
     energyType: 'consumer',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=500&auto=format&fit=crop',
     percentage: 100,
@@ -320,8 +332,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 1000, stickers: 2000, sel: 1000 }, 
     costFactor: 2,
     basePoints: 10,
-    baseTime: 150, // 2min 30s
-    timeFactor: 1.5, // Reverted
+    baseTime: 150, 
+    timeFactor: 1.5, 
     energyType: 'consumer',
     image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=500&auto=format&fit=crop',
     percentage: 100,
@@ -335,8 +347,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 2000, stickers: 1000, sel: 500 },
     costFactor: 2,
     basePoints: 10,
-    baseTime: 150, // 2min 30s
-    timeFactor: 1.6, // Reverted
+    baseTime: 150, 
+    timeFactor: 1.6, 
     energyType: 'consumer',
     reqs: { 'usine_golems': 2 },
     image: 'https://images.unsplash.com/photo-1614728853970-309140b774cf?q=80&w=500&auto=format&fit=crop',
@@ -361,7 +373,7 @@ export const BUILDING_DB: Building[] = [
   {
     id: 'phalange_capteur',
     name: 'Phalange de Capteur',
-    description: 'Scanner longue portée.',
+    description: 'Scanner longue portée (Lune).',
     longDescription: 'Réseau de capteurs haute sensibilité capable de détecter les mouvements de flotte sur les planètes voisines.',
     level: 0,
     baseCost: { risitasium: 20000, stickers: 40000, sel: 20000 },
@@ -371,9 +383,59 @@ export const BUILDING_DB: Building[] = [
     timeFactor: 1.8,
     energyType: 'consumer',
     consumption: { type: 'karma', base: 1000, factor: 1.5 }, 
-    reqs: { 'laboratoire_recherche': 10, 'tech_energie': 10 }, 
+    reqs: { 'base_lunaire': 1 }, 
     image: 'https://images.unsplash.com/photo-1614728263952-84ea2563bc10?q=80&w=500&auto=format&fit=crop',
     percentage: 100,
+    isMoonOnly: true
+  },
+  {
+    id: 'terraformeur',
+    name: 'Terraformeur',
+    description: 'Augmente le nombre de cases.',
+    longDescription: 'Des nanomachines remodèlent la surface de la planète pour la rendre exploitable. Chaque niveau ajoute 5 cases mais consomme énormément d\'énergie.',
+    level: 0,
+    baseCost: { risitasium: 0, stickers: 50000, sel: 100000 },
+    costFactor: 2,
+    basePoints: 200,
+    baseTime: 1000,
+    timeFactor: 2,
+    energyType: 'consumer',
+    consumption: { type: 'karma', base: 1000, factor: 2 }, 
+    reqs: { 'usine_golems': 10, 'tech_energie': 12 }, 
+    image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
+  },
+  {
+    id: 'base_lunaire',
+    name: 'Base Lunaire',
+    description: 'Infrastructure pour Lune.',
+    longDescription: 'Permet de construire des bâtiments sur la lune. Chaque niveau ajoute 3 cases.',
+    level: 0,
+    baseCost: { risitasium: 20000, stickers: 40000, sel: 20000 },
+    costFactor: 2,
+    basePoints: 100,
+    baseTime: 24 * 3600, // 1 Day base
+    timeFactor: 1.5,
+    reqs: {}, 
+    image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
+    isMoonOnly: true
+  },
+  {
+    id: 'porte_saut',
+    name: 'Porte de Saut',
+    description: 'Transport instantané.',
+    longDescription: 'Permet d\'envoyer instantanément une flotte vers une autre lune possédant une porte de saut. Coût nul en Sel mais recharge longue.',
+    level: 0,
+    baseCost: { risitasium: 2000000, stickers: 4000000, sel: 2000000 },
+    costFactor: 2,
+    basePoints: 5000,
+    baseTime: 3 * 24 * 3600, 
+    timeFactor: 1.2,
+    reqs: { 'base_lunaire': 1, 'tech_hyperespace': 7 }, 
+    image: 'https://images.unsplash.com/photo-1506318137071-a8bcbf6755dd?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
+    isMoonOnly: true
   }
 ];
 

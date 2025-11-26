@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LucideHandshake, LucideUsers, LucideLogOut, LucidePlus, LucideSearch, LucideShield, LucideSettings, LucideMail, LucideCheck, LucideX, LucideInfo, LucidePenTool } from 'lucide-react';
+import { LucideHandshake, LucideUsers, LucideLogOut, LucidePlus, LucideSearch, LucideShield, LucideSettings, LucideMail, LucideCheck, LucideX, LucideInfo, LucidePenTool, LucideSwords, LucideFlag } from 'lucide-react';
 import { Alliance, User, AllianceApplication } from '../types';
 import { api } from '../api';
 import { TechCard } from '../components/TechCard';
@@ -12,6 +12,7 @@ export const AllianceView = () => {
     const [alliances, setAlliances] = useState<Alliance[]>([]);
     const [myAlliance, setMyAlliance] = useState<Alliance | null>(null);
     const [view, setView] = useState<'dashboard' | 'list' | 'create'>('list');
+    const [activeTab, setActiveTab] = useState<'overview' | 'diplomacy'>('overview'); // NEW Tab
     
     // Forms
     const [createTag, setCreateTag] = useState('');
@@ -99,6 +100,23 @@ export const AllianceView = () => {
         refreshData();
     };
 
+    // --- WAR HANDLERS ---
+    const handleDeclareWar = async (targetId: string) => {
+        if (!myAlliance) return;
+        if (confirm("Déclarer la guerre ? Le leader ennemi devra accepter.")) {
+            const res = await api.declareWar(myAlliance.id, targetId);
+            if(res.success) alert("Déclaration envoyée.");
+            else alert(res.error);
+            refreshData();
+        }
+    };
+
+    const handleManageWar = async (warId: string, accept: boolean) => {
+        if (!myAlliance) return;
+        await api.manageWar(myAlliance.id, warId, accept);
+        refreshData();
+    };
+
     // --- RENDER HELPERS ---
 
     if (!user) return <div>Chargement...</div>;
@@ -110,134 +128,214 @@ export const AllianceView = () => {
         return (
             <div className="animate-fade-in space-y-6">
                 <div className="border-b border-slate-800 pb-4 flex justify-between items-center">
-                    <h2 className="text-3xl font-display font-bold text-white tracking-widest text-glow">
-                        [{myAlliance.tag}] {myAlliance.name}
-                    </h2>
+                    <div>
+                        <h2 className="text-3xl font-display font-bold text-white tracking-widest text-glow">
+                            [{myAlliance.tag}] {myAlliance.name}
+                        </h2>
+                        <div className="flex gap-4 mt-2">
+                            <button onClick={() => setActiveTab('overview')} className={`text-xs font-bold uppercase ${activeTab === 'overview' ? 'text-tech-gold' : 'text-slate-500'}`}>Aperçu</button>
+                            <button onClick={() => setActiveTab('diplomacy')} className={`text-xs font-bold uppercase ${activeTab === 'diplomacy' ? 'text-tech-gold' : 'text-slate-500'}`}>Diplomatie</button>
+                        </div>
+                    </div>
                     <TechButton variant="danger" onClick={handleLeave} className="text-xs">
                         <LucideLogOut size={14} className="mr-2 inline"/> QUITTER
                     </TechButton>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* LEFT COL: INFO & INTERNAL */}
-                    <div className="lg:col-span-2 space-y-6">
-                        <TechCard className="p-6 min-h-[200px]">
-                            <div className="flex justify-between mb-4">
-                                <h3 className="text-tech-blue font-bold flex items-center gap-2">
-                                    <LucideInfo size={18}/> MESSAGE INTERNE
-                                </h3>
-                                {isFounder && (
-                                    <button onClick={() => { setEditDesc(myAlliance.description); setIsEditing(!isEditing); }} className="text-slate-500 hover:text-white">
-                                        <LucidePenTool size={14}/>
-                                    </button>
-                                )}
-                            </div>
-                            {isEditing ? (
-                                <div className="space-y-2">
-                                    <textarea 
-                                        className="w-full bg-black border border-slate-700 p-2 text-slate-300 text-sm h-32"
-                                        value={editDesc}
-                                        onChange={e => setEditDesc(e.target.value)}
-                                    />
-                                    <div className="flex justify-end gap-2">
-                                        <TechButton variant="secondary" onClick={() => setIsEditing(false)}>Annuler</TechButton>
-                                        <TechButton onClick={handleUpdateDesc}>Sauvegarder</TechButton>
-                                    </div>
+                {activeTab === 'overview' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* LEFT COL: INFO & INTERNAL */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <TechCard className="p-6 min-h-[200px]">
+                                <div className="flex justify-between mb-4">
+                                    <h3 className="text-tech-blue font-bold flex items-center gap-2">
+                                        <LucideInfo size={18}/> MESSAGE INTERNE
+                                    </h3>
+                                    {isFounder && (
+                                        <button onClick={() => { setEditDesc(myAlliance.description); setIsEditing(!isEditing); }} className="text-slate-500 hover:text-white">
+                                            <LucidePenTool size={14}/>
+                                        </button>
+                                    )}
                                 </div>
+                                {isEditing ? (
+                                    <div className="space-y-2">
+                                        <textarea 
+                                            className="w-full bg-black border border-slate-700 p-2 text-slate-300 text-sm h-32"
+                                            value={editDesc}
+                                            onChange={e => setEditDesc(e.target.value)}
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                            <TechButton variant="secondary" onClick={() => setIsEditing(false)}>Annuler</TechButton>
+                                            <TechButton onClick={handleUpdateDesc}>Sauvegarder</TechButton>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-slate-300 text-sm whitespace-pre-wrap font-mono">{myAlliance.description}</p>
+                                )}
+                            </TechCard>
+
+                            <TechCard className="p-6">
+                                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                                    <LucideUsers size={18}/> MEMBRES ({myAlliance.members.length})
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-slate-900 text-slate-500 uppercase text-xs">
+                                            <tr>
+                                                <th className="p-2">Joueur</th>
+                                                <th className="p-2">Rang</th>
+                                                <th className="p-2 text-right">Points</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800">
+                                            {myAlliance.members.map((mid, idx) => (
+                                                <tr key={mid} className="hover:bg-white/5">
+                                                    <td className="p-2 font-bold text-slate-300">
+                                                        {mid === user.id ? <span className="text-tech-gold">{user.username} (Vous)</span> : `Membre ${mid.substring(0,5)}...`}
+                                                    </td>
+                                                    <td className="p-2 text-slate-500">
+                                                        {mid === myAlliance.founderId ? 'Fondateur' : 'Membre'}
+                                                    </td>
+                                                    <td className="p-2 text-right text-slate-400">-</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </TechCard>
+                        </div>
+
+                        {/* RIGHT COL: ADMIN */}
+                        <div className="space-y-6">
+                            <TechCard className="p-6">
+                                <h3 className="text-white font-bold mb-4">INFORMATIONS</h3>
+                                <ul className="space-y-2 text-sm text-slate-400">
+                                    <li className="flex justify-between">
+                                        <span>Points Totaux:</span>
+                                        <span className="text-white font-mono">{formatNumber(myAlliance.points)}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Création:</span>
+                                        <span className="text-white font-mono">{new Date(myAlliance.creationDate).toLocaleDateString()}</span>
+                                    </li>
+                                    <li className="flex justify-between">
+                                        <span>Recrutement:</span>
+                                        <span className={`uppercase font-bold ${myAlliance.recruitment === 'open' ? 'text-green-500' : 'text-red-500'}`}>
+                                            {myAlliance.recruitment === 'open' ? 'Ouvert' : myAlliance.recruitment}
+                                        </span>
+                                    </li>
+                                </ul>
+                            </TechCard>
+
+                            {isFounder && (
+                                <TechCard className="p-6 border-tech-gold/30">
+                                    <h3 className="text-tech-gold font-bold mb-4 flex items-center gap-2">
+                                        <LucideSettings size={18}/> GESTION
+                                    </h3>
+                                    
+                                    <div className="mb-4">
+                                        <h4 className="text-xs uppercase text-slate-500 mb-2">Candidatures ({myAlliance.applications.length})</h4>
+                                        {myAlliance.applications.length === 0 ? (
+                                            <p className="text-xs text-slate-600 italic">Aucune demande en attente.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {myAlliance.applications.map(app => (
+                                                    <div key={app.id} className="bg-black p-2 rounded border border-slate-700 text-xs">
+                                                        <div className="flex justify-between font-bold text-white mb-1">
+                                                            <span>{app.username}</span>
+                                                            <span>{formatNumber(app.points)} pts</span>
+                                                        </div>
+                                                        <p className="text-slate-400 mb-2 italic">"{app.message}"</p>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => handleApplication(app.id, true)} className="flex-1 bg-green-900/50 text-green-400 border border-green-800 hover:bg-green-800 rounded py-1 flex justify-center"><LucideCheck size={12}/></button>
+                                                            <button onClick={() => handleApplication(app.id, false)} className="flex-1 bg-red-900/50 text-red-400 border border-red-800 hover:bg-red-800 rounded py-1 flex justify-center"><LucideX size={12}/></button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </TechCard>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'diplomacy' && (
+                    <div className="space-y-6">
+                        <TechCard className="p-6 bg-red-900/10 border-red-900/30">
+                            <h3 className="text-red-500 font-bold mb-4 flex items-center gap-2"><LucideSwords size={18}/> GUERRES ACTIVES</h3>
+                            {(!myAlliance.wars || myAlliance.wars.filter(w => w.status === 'active').length === 0) ? (
+                                <p className="text-slate-500 italic text-sm">Paix galactique (pour l'instant).</p>
                             ) : (
-                                <p className="text-slate-300 text-sm whitespace-pre-wrap font-mono">{myAlliance.description}</p>
+                                <div className="space-y-4">
+                                    {myAlliance.wars.filter(w => w.status === 'active').map(war => (
+                                        <div key={war.id} className="flex items-center justify-between bg-black/50 p-4 border border-red-800 rounded">
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-xl font-bold text-red-500">{war.attackerName}</div>
+                                                <div className="text-slate-500">VS</div>
+                                                <div className="text-xl font-bold text-blue-400">{war.defenderName}</div>
+                                            </div>
+                                            <div className="text-xs font-mono text-slate-400">
+                                                Score: {formatNumber(war.scoreAttacker)} - {formatNumber(war.scoreDefender)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </TechCard>
 
                         <TechCard className="p-6">
-                            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                                <LucideUsers size={18}/> MEMBRES ({myAlliance.members.length})
-                            </h3>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-slate-900 text-slate-500 uppercase text-xs">
-                                        <tr>
-                                            <th className="p-2">Joueur</th>
-                                            <th className="p-2">Rang</th>
-                                            <th className="p-2 text-right">Points</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800">
-                                        {/* Need to fetch member names, simplified here assuming we had full user objects or fetch them */}
-                                        {/* For this demo, we only have IDs in alliance.members. 
-                                            In a real app, we would join data. 
-                                            For now, let's display ID and highlight current user. */}
-                                        {myAlliance.members.map((mid, idx) => (
-                                            <tr key={mid} className="hover:bg-white/5">
-                                                <td className="p-2 font-bold text-slate-300">
-                                                    {mid === user.id ? <span className="text-tech-gold">{user.username} (Vous)</span> : `Membre ${mid.substring(0,5)}...`}
-                                                </td>
-                                                <td className="p-2 text-slate-500">
-                                                    {mid === myAlliance.founderId ? 'Fondateur' : 'Membre'}
-                                                </td>
-                                                <td className="p-2 text-right text-slate-400">-</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </TechCard>
-                    </div>
-
-                    {/* RIGHT COL: ADMIN */}
-                    <div className="space-y-6">
-                        <TechCard className="p-6">
-                            <h3 className="text-white font-bold mb-4">INFORMATIONS</h3>
-                            <ul className="space-y-2 text-sm text-slate-400">
-                                <li className="flex justify-between">
-                                    <span>Points Totaux:</span>
-                                    <span className="text-white font-mono">{formatNumber(myAlliance.points)}</span>
-                                </li>
-                                <li className="flex justify-between">
-                                    <span>Création:</span>
-                                    <span className="text-white font-mono">{new Date(myAlliance.creationDate).toLocaleDateString()}</span>
-                                </li>
-                                <li className="flex justify-between">
-                                    <span>Recrutement:</span>
-                                    <span className={`uppercase font-bold ${myAlliance.recruitment === 'open' ? 'text-green-500' : 'text-red-500'}`}>
-                                        {myAlliance.recruitment === 'open' ? 'Ouvert' : myAlliance.recruitment}
-                                    </span>
-                                </li>
-                            </ul>
+                            <h3 className="text-white font-bold mb-4 flex items-center gap-2"><LucideMail size={18}/> REQUÊTES DIPLOMATIQUES</h3>
+                            {(!myAlliance.wars || myAlliance.wars.filter(w => w.status === 'pending').length === 0) ? (
+                                <p className="text-slate-500 italic text-sm">Aucune demande en attente.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {myAlliance.wars.filter(w => w.status === 'pending').map(war => {
+                                        const isIncoming = war.defenderId === myAlliance?.id;
+                                        return (
+                                            <div key={war.id} className="flex items-center justify-between bg-slate-900 p-3 border border-slate-700 rounded">
+                                                <div>
+                                                    <span className="font-bold text-white">{isIncoming ? war.attackerName : war.defenderName}</span>
+                                                    <span className="text-slate-400 text-xs ml-2">
+                                                        {isIncoming ? "veut vous déclarer la guerre" : "doit accepter votre déclaration"}
+                                                    </span>
+                                                </div>
+                                                {isIncoming && isFounder ? (
+                                                    <div className="flex gap-2">
+                                                        <TechButton onClick={() => handleManageWar(war.id, true)} className="text-xs py-1 bg-red-900 border-red-700">ACCEPTER LE DÉFI</TechButton>
+                                                        <TechButton onClick={() => handleManageWar(war.id, false)} variant="secondary" className="text-xs py-1">REFUSER</TechButton>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-slate-500 italic">En attente...</span>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </TechCard>
 
                         {isFounder && (
-                            <TechCard className="p-6 border-tech-gold/30">
-                                <h3 className="text-tech-gold font-bold mb-4 flex items-center gap-2">
-                                    <LucideSettings size={18}/> GESTION
-                                </h3>
-                                
-                                <div className="mb-4">
-                                    <h4 className="text-xs uppercase text-slate-500 mb-2">Candidatures ({myAlliance.applications.length})</h4>
-                                    {myAlliance.applications.length === 0 ? (
-                                        <p className="text-xs text-slate-600 italic">Aucune demande en attente.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {myAlliance.applications.map(app => (
-                                                <div key={app.id} className="bg-black p-2 rounded border border-slate-700 text-xs">
-                                                    <div className="flex justify-between font-bold text-white mb-1">
-                                                        <span>{app.username}</span>
-                                                        <span>{formatNumber(app.points)} pts</span>
-                                                    </div>
-                                                    <p className="text-slate-400 mb-2 italic">"{app.message}"</p>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => handleApplication(app.id, true)} className="flex-1 bg-green-900/50 text-green-400 border border-green-800 hover:bg-green-800 rounded py-1 flex justify-center"><LucideCheck size={12}/></button>
-                                                        <button onClick={() => handleApplication(app.id, false)} className="flex-1 bg-red-900/50 text-red-400 border border-red-800 hover:bg-red-800 rounded py-1 flex justify-center"><LucideX size={12}/></button>
-                                                    </div>
-                                                </div>
-                                            ))}
+                            <TechCard className="p-6">
+                                <h3 className="text-white font-bold mb-4 flex items-center gap-2"><LucideFlag size={18}/> DÉCLARER UNE GUERRE</h3>
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    {alliances.filter(a => a.id !== myAlliance?.id).map(ally => (
+                                        <div key={ally.id} className="flex justify-between items-center p-2 hover:bg-white/5 border-b border-slate-800">
+                                            <span className="text-slate-300">[{ally.tag}] {ally.name}</span>
+                                            <button 
+                                                onClick={() => handleDeclareWar(ally.id)}
+                                                className="text-xs bg-red-900/30 text-red-500 border border-red-800 px-2 py-1 rounded hover:bg-red-800 hover:text-white"
+                                            >
+                                                DÉCLARER
+                                            </button>
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
                             </TechCard>
                         )}
                     </div>
-                </div>
+                )}
             </div>
         );
     }

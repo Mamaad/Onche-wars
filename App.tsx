@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Planet, DetailedCombatReport } from './types';
+import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Planet, DetailedCombatReport, Artifact } from './types';
 import { getCost, getProduction, getConsumption, getConstructionTime, calculateCombat, getStorageCapacity } from './utils';
 import { api } from './api';
-import { SHIP_DB, DEFENSE_DB, QUEST_DB } from './constants';
+import { SHIP_DB, DEFENSE_DB, QUEST_DB, ARTIFACT_DB } from './constants';
 
 // Components
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { TutorialWidget } from './components/TutorialWidget';
+import { ChatWidget } from './components/ChatWidget'; // NEW
 
 // Views
 import { AuthView } from './views/AuthView';
@@ -25,11 +26,12 @@ import { OfficerClubView } from './views/OfficerClubView';
 import { SimulatorView } from './views/SimulatorView';
 import { MessagesView } from './views/MessagesView';
 import { HelpView } from './views/HelpView';
-import { MarketView } from './views/MarketView'; // UPDATED
+import { MarketView } from './views/MarketView'; 
 import { HighscoreView } from './views/HighscoreView';
 import { AllianceView } from './views/AllianceView';
 import { AdminView } from './views/AdminView';
 import { ResourceSettingsView } from './views/ResourceSettingsView';
+import { CommanderView } from './views/CommanderView'; // NEW
 import { UnderConstruction } from './views/UnderConstruction';
 
 const App = () => {
@@ -69,6 +71,13 @@ const App = () => {
           setLoadingAuth(false);
       });
   }, []);
+
+  // APPLY THEME
+  useEffect(() => {
+      if(currentUser?.theme) {
+          document.body.className = `scanlines overflow-x-hidden theme-${currentUser.theme}`;
+      }
+  }, [currentUser?.theme]);
 
   const loadPlanetData = (user: User, planetId: string) => {
       const p = user.planets.find(x => x.id === planetId) || user.planets[0];
@@ -118,6 +127,10 @@ const App = () => {
       const energyBonus = officers.find(o => o.id === 'off_celestin' && o.active) ? 1.1 : 1.0;
       const currentPlanet = currentUser.planets.find(p => p.id === currentUser.currentPlanetId) || currentUser.planets[0];
 
+      // --- TALENT BONUSES ---
+      const minerLevel = currentUser.talents.find(t => t.id === 't_mine_boost')?.currentLevel || 0;
+      const mineBonus = 1 + (minerLevel * 0.02);
+
       // --- PRODUCTION ---
       let producedKarma = 0;
       let consumedKarma = 0;
@@ -166,7 +179,10 @@ const App = () => {
         buildings.forEach(b => {
           if (b.level > 0 && b.production) {
             const percent = b.percentage || 100;
-            const amount = getProduction(b.production.base, b.production.factor, b.level, b.production.type, currentPlanet.temperature, percent) * deltaSeconds * efficiency;
+            // Apply Mine Bonus from Talents
+            const talentMulti = (b.id.includes('mine') || b.id.includes('extracteur') || b.id.includes('raffineur')) ? mineBonus : 1;
+            
+            const amount = getProduction(b.production.base, b.production.factor, b.level, b.production.type, currentPlanet.temperature, percent) * deltaSeconds * efficiency * talentMulti;
             
             if (b.production.type === 'risitasium') newRis = Math.min(maxRis, newRis + amount);
             if (b.production.type === 'stickers') newSti = Math.min(maxSti, newSti + amount);
@@ -197,8 +213,18 @@ const App = () => {
           if (currentItem.startTime > 0 && now >= currentItem.endTime) {
               if (currentItem.type === 'building') {
                   setBuildings(bs => bs.map(b => b.id === currentItem.id ? {...b, level: currentItem.targetLevel} : b));
+                  // XP Gain for Building
+                  if(currentUser) {
+                      const gain = currentItem.targetLevel * 10;
+                      currentUser.commanderXp += gain;
+                  }
               } else if (currentItem.type === 'research') {
                   setResearch(rs => rs.map(r => r.id === currentItem.id ? {...r, level: currentItem.targetLevel} : r));
+                  // XP Gain for Research
+                  if(currentUser) {
+                      const gain = currentItem.targetLevel * 20;
+                      currentUser.commanderXp += gain;
+                  }
               }
 
               const nextQueue = prevQueue.slice(1);
@@ -328,7 +354,12 @@ const App = () => {
           if (res.winner === 'attacker') {
              const loot = { risitasium: 1000 + Math.random()*2000, stickers: 500 + Math.random()*500, sel: 0, karma: 0, karmaMax: 0, redpills: 0 };
              let content = 'Vous avez écrasé la défense ennemie.';
-             if (res.moonCreated) content += '\n\nUNE LUNE A ÉTÉ CRÉÉE !';
+             if (res.moonCreated) {
+                 content += '\n\nUNE LUNE A ÉTÉ CRÉÉE !';
+                 // Add Moon to target user (Simulation needs target user access, skipped for now or handled via backend logic)
+                 // In single player simulation, we assume we attacked an AI or another player.
+                 // If another player, we should add moon to their planet list in api.ts.
+             }
              
              await api.updateGalaxyDebris(m.target, { risitasium: Math.floor(res.debris * 0.7), stickers: Math.floor(res.debris * 0.3), sel: 0, karma:0, karmaMax:0, redpills:0 });
 
@@ -359,27 +390,70 @@ const App = () => {
       }
       else if (m.type === 'expedition') {
           const rand = Math.random();
-          if (rand > 0.3) {
-             const foundRes = { risitasium: 5000, stickers: 2000, sel: 500, karma: 0, karmaMax: 0, redpills: 0 };
-             newReport = { ...newReport, type: 'expedition', title: 'Découverte !', content: 'Votre expédition a trouvé un ancien cimetière de vaisseaux.', loot: foundRes };
-             returnFleet(m, foundRes);
+          let content = '';
+          let loot = undefined;
+
+          if (rand > 0.6) {
+             // Resources
+             loot = { risitasium: 5000, stickers: 2000, sel: 500, karma: 0, karmaMax: 0, redpills: 0 };
+             content = 'Votre expédition a trouvé un ancien cimetière de vaisseaux. Des ressources ont été récupérées.';
+          } else if (rand > 0.4) {
+             // Artifact
+             const artifact = ARTIFACT_DB[Math.floor(Math.random() * ARTIFACT_DB.length)];
+             content = `INCROYABLE ! L'expédition a découvert un artefact rare : ${artifact.name}.`;
+             // Add artifact to user inventory
+             if(currentUser) {
+                 currentUser.inventory.push(artifact);
+             }
+          } else if (rand > 0.2) {
+             content = 'L\'expédition n\'a rien trouvé d\'intéressant à part des photos de chats cosmiques.';
           } else {
-             newReport = { ...newReport, type: 'expedition', title: 'Trou Noir', content: 'La flotte a disparu dans la faille 410.' };
+             content = 'La flotte a disparu dans la faille 410. Aucun survivant.';
+             // Fleet lost, don't return
+             setReports(prev => [...prev, { ...newReport, type: 'expedition', title: 'Trou Noir', content }]);
+             return;
           }
+          
+          newReport = { ...newReport, type: 'expedition', title: 'Rapport d\'Expédition', content, loot };
+          returnFleet(m, loot);
       }
       else if (m.type === 'spy') {
            const spyLevel = research.find(r => r.id === 'espionnage')?.level || 0;
-           const enemySpy = 3; 
-           const diff = spyLevel - enemySpy;
+           const talentSpy = currentUser?.talents.find(t => t.id === 't_spy_tech')?.currentLevel || 0;
            
-           let content = `Scan du secteur ${m.target}.\n`;
-           if (diff < 0) content += "Signal brouillé. Impossible d'analyser.";
+           const enemySpy = 3; // Mock enemy spy level
+           const diff = (spyLevel + talentSpy) - enemySpy;
+           
+           let content = `Rapport du secteur ${m.target}.\n`;
+           content += `Niveau Espionnage: ${spyLevel + talentSpy} vs ${enemySpy}\n-------------------\n`;
+
+           if (diff < 0) content += "Signal brouillé. La flotte a été détectée et détruite.";
            else {
-               content += "Ressources: Métal: 12k, Cristal: 5k.\n";
-               if (diff >= 2) content += "Flotte: 50 Chasseurs Légers détectés.\n";
-               if (diff >= 3) content += "Défense: 10 Lanceurs de PLS.\n";
-               if (diff >= 5) content += "Bâtiments: Mine de Metal niv 20.\n";
-               if (diff >= 7) content += "Technologies: Laser niv 10.\n";
+               content += "Ressources: [Ris: 12 400] [Sti: 5 000] [Sel: 1 200]\n";
+               
+               if (diff >= 2) {
+                   content += "\nFLOTTE:\n- Chasseur Léger: 50\n- Croiseur: 12\n";
+               } else {
+                   content += "\nFlotte: Données insuffisantes.\n";
+               }
+
+               if (diff >= 3) {
+                   content += "\nDÉFENSE:\n- Lanceur de PLS: 100\n- Laser GneuGneu: 20\n";
+               } else {
+                   content += "\nDéfense: Données insuffisantes.\n";
+               }
+
+               if (diff >= 5) {
+                   content += "\nBÂTIMENTS:\n- Mine de Métal: 20\n- Usine de Golems: 5\n";
+               } else {
+                   content += "\nBâtiments: Données insuffisantes.\n";
+               }
+
+               if (diff >= 7) {
+                   content += "\nTECHNOLOGIES:\n- Laser: 10\n- Bouclier: 8\n";
+               } else {
+                   content += "\nTechnologies: Données insuffisantes.\n";
+               }
            }
 
            newReport = { ...newReport, type: 'spy', title: 'Rapport d\'espionnage', content };
@@ -412,10 +486,25 @@ const App = () => {
     const b = buildings.find(x => x.id === buildingId);
     if (!b) return;
 
-    // Check Fields
     const currentPlanet = currentUser?.planets.find(p => p.id === currentUser.currentPlanetId);
+    
+    // Moon Check
+    if (b.isMoonOnly && !currentPlanet?.isMoon) {
+        alert("Ce bâtiment ne peut être construit que sur une Lune.");
+        return;
+    }
+    if (currentPlanet?.isMoon && !b.isMoonOnly && !['base_lunaire', 'phalange_capteur', 'porte_saut', 'usine_golems', 'silo_missiles'].includes(b.id)) {
+        // Restriction for moon buildings
+        // Simplified: Allow standard facilities on moon? Usually no mines.
+        if (b.production) {
+            alert("Impossible de construire des mines sur une Lune.");
+            return;
+        }
+    }
+
+    // Check Fields
     if (currentPlanet && currentPlanet.fields.current >= currentPlanet.fields.max) {
-        alert("Planète pleine ! Terraformation requise.");
+        alert("Planète pleine ! Terraformation ou Base Lunaire requise.");
         return;
     }
 
@@ -563,7 +652,6 @@ const App = () => {
   if (loadingAuth) return <div className="min-h-screen bg-black flex items-center justify-center text-tech-gold animate-pulse">CHARGEMENT DU LIEN NEURAL...</div>;
   if (!currentUser || !resources) return <AuthView onLogin={handleLogin} />;
   
-  // Update view props if needed
   const renderContent = () => {
     if (detailBuilding) {
       const currentB = buildings.find(b => b.id === detailBuilding.id) || detailBuilding;
@@ -577,13 +665,14 @@ const App = () => {
       case 'techtree': return <TechTreeView buildings={buildings} research={research} fleet={fleet} />;
       case 'resources': return <ResourceSettingsView buildings={buildings} resources={resources} user={currentUser} onUpdatePercent={handleUpdatePercent} />;
       case 'research': return <ResearchView research={research} buildings={buildings} resources={resources} onResearch={handleResearch} />;
-      case 'shipyard': return <ShipyardView fleet={fleet} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(fleet, setFleet, id, c)} />;
+      case 'shipyard': return <ShipyardView fleet={fleet} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(fleet, setFleet, id, c)} user={currentUser}/>;
       case 'defense': return <DefenseView defenses={defenses} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(defenses, setDefenses, id, c)} />;
       case 'fleet': return <FleetView fleet={fleet} missions={missions} onSendMission={handleSendMission} initialTarget={fleetParams?.target} initialMission={fleetParams?.mission} resources={resources} />;
       case 'officers': return <OfficerClubView officers={officers} resources={resources} onRecruit={handleRecruit} />;
-      case 'merchant': return <MarketView resources={resources} onTrade={handleTrade} user={currentUser} />; // CHANGED
+      case 'merchant': return <MarketView resources={resources} onTrade={handleTrade} user={currentUser} />; 
       case 'highscore': return <HighscoreView />;
       case 'alliance': return <AllianceView />;
+      case 'commander': return <CommanderView user={currentUser} />; // NEW
       case 'admin': return currentUser.isAdmin ? <AdminView /> : <UnderConstruction title="ACCÈS REFUSÉ" />;
       case 'simulator': return <SimulatorView />;
       case 'messages': return <MessagesView reports={reports} onRead={handleReadMessage} />;
@@ -608,7 +697,22 @@ const App = () => {
         onPlanetChange={handlePlanetChange}
       />
 
-      <div className="fixed top-4 right-4 z-[60]">
+      <div className="fixed top-4 right-4 z-[60] flex gap-2">
+         {/* Skin Selector */}
+         <select 
+            value={currentUser.theme} 
+            onChange={(e) => {
+                const u = {...currentUser, theme: e.target.value as any};
+                setCurrentUser(u);
+                api.saveGameState(u);
+            }}
+            className="bg-slate-900 text-slate-400 border border-slate-700 text-xs rounded px-2 outline-none"
+         >
+             <option value="default">Theme: Default</option>
+             <option value="retro">Theme: Retro 8-Bit</option>
+             <option value="neon">Theme: Cyberpunk Neon</option>
+         </select>
+
          <button onClick={handleLogout} className="bg-red-900/50 text-red-500 border border-red-800 px-3 py-1 text-xs uppercase rounded hover:bg-red-800 hover:text-white transition-colors">Déconnexion</button>
       </div>
 
@@ -621,8 +725,9 @@ const App = () => {
         </div>
       </main>
 
-      {/* TUTORIAL WIDGET MOVED HERE FOR GLOBAL ACCESS AND PASSING FUNCTION */}
+      {/* WIDGETS */}
       <TutorialWidget user={currentUser} onClaim={handleClaimQuest} />
+      <ChatWidget user={currentUser} />
     </div>
   );
 };
