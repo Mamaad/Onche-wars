@@ -381,6 +381,9 @@ export const api = {
         const freshFounder = users.find(u => u.id === founder.id);
         if (!freshFounder) return { success: false, error: "Utilisateur introuvable." };
         if (freshFounder.allianceId) return { success: false, error: "Vous êtes déjà dans une alliance." };
+        
+        // STRICT POINTS CHECK
+        if (freshFounder.points.total < 1000) return { success: false, error: "1000 points requis." };
 
         const alliances = getAlliancesDB();
         if (alliances.some(a => a.tag === tag || a.name === name)) {

@@ -1,10 +1,8 @@
-
 import React, { useState } from 'react';
 import { LucideGlobe, LucideActivity, LucideShield, LucideEdit2, LucideCheck, LucideMaximize2, LucideThermometer } from 'lucide-react';
 import { Resources, User } from '../types'; // Import User
 import { TechCard } from '../components/TechCard';
 import { TechButton } from '../components/TechButton';
-import { TutorialWidget } from '../components/TutorialWidget';
 import { api } from '../api';
 
 // Pass current User to display planet stats correctly
@@ -115,9 +113,6 @@ export const Overview = ({ resources, planetName, onRename, user }: { resources:
         </div>
       </TechCard>
     </div>
-
-    {/* TUTORIAL WIDGET */}
-    <TutorialWidget user={user} />
   </div>
   );
 };

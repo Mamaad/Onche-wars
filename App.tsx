@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Planet, DetailedCombatReport } from './types';
 import { getCost, getProduction, getConsumption, getConstructionTime, calculateCombat } from './utils';
@@ -8,6 +7,7 @@ import { SHIP_DB, DEFENSE_DB, QUEST_DB } from './constants';
 // Components
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { TutorialWidget } from './components/TutorialWidget';
 
 // Views
 import { AuthView } from './views/AuthView';
@@ -177,9 +177,6 @@ const App = () => {
                   const nextItem = nextQueue[0];
                   nextQueue[0] = { ...nextItem, startTime: now, endTime: now + (nextItem.totalDuration * 1000) };
               }
-              // TRIGGER QUEST CHECK ON COMPLETION
-              checkQuests();
-              
               return nextQueue;
           }
           
@@ -226,35 +223,36 @@ const App = () => {
 
   // --- HELPERS ---
   
-  const checkQuests = () => {
-      // Create a temporary user object with current state to check condition
+  const handleClaimQuest = (questId: string) => {
+      if (!currentUser) return;
+      const quest = QUEST_DB.find(q => q.id === questId);
+      if (!quest) return;
+
+      // Re-verify condition on current state to be safe
       const tempUser = { 
           ...currentUser!, 
           planets: currentUser!.planets.map(p => p.id === currentUser!.currentPlanetId ? {...p, buildings, fleet} : p),
           research 
       };
 
-      const newCompleted: string[] = [];
-      QUEST_DB.forEach(q => {
-          if (!tempUser.completedQuests.includes(q.id) && q.condition(tempUser)) {
-              newCompleted.push(q.id);
-              // Give reward
-              setResources(prev => {
-                  if(!prev) return null;
-                  return {
-                      ...prev,
-                      risitasium: prev.risitasium + (q.reward.risitasium || 0),
-                      stickers: prev.stickers + (q.reward.stickers || 0),
-                      sel: prev.sel + (q.reward.sel || 0),
-                      redpills: prev.redpills + (q.reward.redpills || 0),
-                  }
-              });
-              alert(`QUÊTE TERMINÉE : ${q.title} ! Récompense obtenue.`);
-          }
-      });
-      
-      if (newCompleted.length > 0) {
-          setCurrentUser(prev => prev ? ({...prev, completedQuests: [...prev.completedQuests, ...newCompleted]}) : null);
+      if (quest.condition(tempUser)) {
+          setResources(prev => {
+              if(!prev) return null;
+              return {
+                  ...prev,
+                  risitasium: prev.risitasium + (quest.reward.risitasium || 0),
+                  stickers: prev.stickers + (quest.reward.stickers || 0),
+                  sel: prev.sel + (quest.reward.sel || 0),
+                  redpills: prev.redpills + (quest.reward.redpills || 0),
+              }
+          });
+          
+          // Optimistic Update
+          setCurrentUser(prev => prev ? ({...prev, completedQuests: [...prev.completedQuests, quest.id]}) : null);
+          
+          // Save immediately
+          const userToSave = { ...tempUser, completedQuests: [...tempUser.completedQuests, quest.id] };
+          api.saveGameState(userToSave);
       }
   };
 
@@ -462,7 +460,6 @@ const App = () => {
     if (resources.risitasium >= totalRis && resources.stickers >= totalSti && resources.sel >= totalSel) {
         setResources(prev => prev ? ({ ...prev, risitasium: prev.risitasium - totalRis, stickers: prev.stickers - totalSti, sel: prev.sel - totalSel }) : null);
         setDb((prev: any) => prev.map((unit: any) => unit.id === id ? { ...unit, count: unit.count + count } : unit));
-        checkQuests(); // Check fleet quests
     }
   };
 
@@ -577,6 +574,9 @@ const App = () => {
           {renderContent()}
         </div>
       </main>
+
+      {/* TUTORIAL WIDGET MOVED HERE FOR GLOBAL ACCESS AND PASSING FUNCTION */}
+      <TutorialWidget user={currentUser} onClaim={handleClaimQuest} />
     </div>
   );
 };
