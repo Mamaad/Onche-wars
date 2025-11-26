@@ -1,18 +1,19 @@
 
 import React from 'react';
-import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull } from 'lucide-react';
+import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull, LucideChevronDown } from 'lucide-react';
 import { TechCard } from './TechCard';
 import { Building, ConstructionItem, User } from '../types';
 import { formatTime } from '../utils';
 
-export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildings, queue, user }: { 
+export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildings, queue, user, onPlanetChange }: { 
     activeTab: string, 
     setTab: any, 
     isMobileOpen: boolean, 
     setMobileOpen: any, 
     buildings: Building[], 
     queue: ConstructionItem[],
-    user: User
+    user: User,
+    onPlanetChange?: (id: string) => void
 }) => {
   const hasBuilding = (id: string) => buildings.find((x: Building) => x.id === id && x.level > 0);
   
@@ -40,6 +41,8 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
     const b = buildings.find(x => x.id === item.id);
     return b ? `${b.name} (${item.targetLevel})` : "Recherche";
   };
+  
+  const currentPlanet = user.planets.find(p => p.id === user.currentPlanetId) || user.planets[0];
 
   return (
     <>
@@ -56,12 +59,28 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
       `}>
         <div className="flex-1 flex flex-col p-6 gap-2">
           <div className="text-center pb-6 border-b border-slate-800/50 mb-4 relative">
-            <div className="absolute inset-0 bg-radial-glow opacity-30 pointer-events-none"></div>
-            <div className="w-24 h-24 bg-gradient-to-br from-slate-800 to-black rounded-full mx-auto mb-3 flex items-center justify-center border-2 border-slate-700 shadow-xl overflow-hidden group cursor-pointer">
-              <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🪐</span>
-            </div>
-            <h3 className="text-white font-display font-bold text-lg tracking-wide text-glow">{user.planetName}</h3>
-            <p className="text-tech-blue font-mono text-sm tracking-wider">[1:42:6]</p>
+             <div className="absolute inset-0 bg-radial-glow opacity-30 pointer-events-none"></div>
+             
+             {/* PLANET SELECTOR */}
+             <div className="relative group cursor-pointer mb-3">
+                 <select 
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2 rounded appearance-none font-display font-bold text-center focus:border-tech-gold outline-none"
+                    value={user.currentPlanetId}
+                    onChange={(e) => onPlanetChange && onPlanetChange(e.target.value)}
+                 >
+                     {user.planets.map(p => (
+                         <option key={p.id} value={p.id}>
+                             {p.name} [{p.coords.g}:{p.coords.s}:{p.coords.p}]
+                         </option>
+                     ))}
+                 </select>
+                 <LucideChevronDown className="absolute right-2 top-3 text-slate-500 pointer-events-none" size={16}/>
+             </div>
+
+             <div className="w-24 h-24 bg-gradient-to-br from-slate-800 to-black rounded-full mx-auto mb-3 flex items-center justify-center border-2 border-slate-700 shadow-xl overflow-hidden group">
+               <span className="text-5xl group-hover:scale-110 transition-transform duration-500">🪐</span>
+             </div>
+             <p className="text-tech-blue font-mono text-sm tracking-wider">[{currentPlanet.coords.g}:{currentPlanet.coords.s}:{currentPlanet.coords.p}]</p>
           </div>
 
           <nav className="space-y-1">

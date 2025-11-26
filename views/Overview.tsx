@@ -1,23 +1,44 @@
 
 import React, { useState } from 'react';
-import { LucideGlobe, LucideActivity, LucideShield, LucideEdit2, LucideCheck } from 'lucide-react';
-import { Resources } from '../types';
+import { LucideGlobe, LucideActivity, LucideShield, LucideEdit2, LucideCheck, LucideMaximize2, LucideThermometer } from 'lucide-react';
+import { Resources, User } from '../types'; // Import User
 import { TechCard } from '../components/TechCard';
 import { TechButton } from '../components/TechButton';
+import { TutorialWidget } from '../components/TutorialWidget';
+import { api } from '../api';
 
-export const Overview = ({ resources, planetName, onRename }: { resources: Resources, planetName: string, onRename: (name: string) => void }) => {
+// Pass current User to display planet stats correctly
+export const Overview = ({ resources, planetName, onRename, user }: { resources: Resources, planetName: string, onRename: (name: string) => void, user: User }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(planetName);
+  const [vacationLoading, setVacationLoading] = useState(false);
+
+  const currentPlanet = user.planets.find(p => p.id === user.currentPlanetId) || user.planets[0];
 
   const handleSaveName = () => {
       onRename(newName);
       setIsEditing(false);
   };
 
+  const toggleVacation = async () => {
+      setVacationLoading(true);
+      const updatedUser = { ...user, vacationMode: !user.vacationMode };
+      await api.saveGameState(updatedUser);
+      window.location.reload(); // Simple reload to refresh app state
+  };
+
   return (
   <div className="animate-fade-in space-y-6">
     <div className="flex items-center justify-between border-b border-slate-800 pb-4">
        <h2 className="text-3xl font-display font-bold text-white tracking-widest text-glow">VUE D'ENSEMBLE</h2>
+       
+       <button 
+         onClick={toggleVacation}
+         disabled={vacationLoading}
+         className={`text-xs px-3 py-1 rounded border ${user.vacationMode ? 'bg-blue-500 text-white border-blue-400' : 'bg-slate-800 text-slate-400 border-slate-600'}`}
+       >
+           {user.vacationMode ? 'MODE VACANCES ACTIF' : 'ACTIVER MODE VACANCES'}
+       </button>
     </div>
     
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -50,17 +71,24 @@ export const Overview = ({ resources, planetName, onRename }: { resources: Resou
           </div>
           
           <ul className="space-y-3 text-slate-300 text-sm font-mono">
-             {[
-               { l: 'Diamètre', v: '12,800 km' },
-               { l: 'Température', v: '12°C - 48°C' },
-               { l: 'Position', v: '[1:42:6]' },
-               { l: 'Cases', v: '12 / 163' },
-             ].map((item, i) => (
-               <li key={i} className="flex justify-between border-b border-slate-800 pb-1 last:border-0">
-                 <span className="text-slate-500">{item.l}</span>
-                 <span className="text-white font-bold">{item.v}</span>
-               </li>
-             ))}
+             <li className="flex justify-between border-b border-slate-800 pb-1">
+                 <span className="text-slate-500">Diamètre</span>
+                 <span className="text-white font-bold">12,800 km</span>
+             </li>
+             <li className="flex justify-between border-b border-slate-800 pb-1">
+                 <span className="text-slate-500 flex items-center gap-2"><LucideThermometer size={14}/> Température</span>
+                 <span className="text-white font-bold">{currentPlanet.temperature.min}°C / {currentPlanet.temperature.max}°C</span>
+             </li>
+             <li className="flex justify-between border-b border-slate-800 pb-1">
+                 <span className="text-slate-500">Position</span>
+                 <span className="text-white font-bold">[{currentPlanet.coords.g}:{currentPlanet.coords.s}:{currentPlanet.coords.p}]</span>
+             </li>
+             <li className="flex justify-between border-b border-slate-800 pb-1">
+                 <span className="text-slate-500 flex items-center gap-2"><LucideMaximize2 size={14}/> Cases</span>
+                 <span className={`${currentPlanet.fields.current >= currentPlanet.fields.max ? 'text-red-500' : 'text-white'} font-bold`}>
+                     {currentPlanet.fields.current} / {currentPlanet.fields.max}
+                 </span>
+             </li>
           </ul>
         </div>
       </TechCard>
@@ -87,6 +115,9 @@ export const Overview = ({ resources, planetName, onRename }: { resources: Resou
         </div>
       </TechCard>
     </div>
+
+    {/* TUTORIAL WIDGET */}
+    <TutorialWidget user={user} />
   </div>
   );
 };

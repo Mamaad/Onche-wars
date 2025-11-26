@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report } from './types';
+import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Planet, DetailedCombatReport } from './types';
 import { getCost, getProduction, getConsumption, getConstructionTime, calculateCombat } from './utils';
 import { api } from './api';
-import { SHIP_DB, DEFENSE_DB } from './constants';
+import { SHIP_DB, DEFENSE_DB, QUEST_DB } from './constants';
 
 // Components
 import { Header } from './components/Header';
@@ -35,19 +35,22 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // --- GAME STATE (Local copies for reactivity) ---
+  // --- GAME STATE (Synced from Current Planet) ---
   const [tab, setTab] = useState('overview');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [detailBuilding, setDetailBuilding] = useState<Building | null>(null);
   const [fleetParams, setFleetParams] = useState<any>(null);
   
+  // These are copies of the CURRENT PLANET data for easier binding
   const [resources, setResources] = useState<Resources | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [research, setResearch] = useState<Research[]>([]);
   const [fleet, setFleet] = useState<Ship[]>([]);
   const [defenses, setDefenses] = useState<Defense[]>([]);
-  const [officers, setOfficers] = useState<Officer[]>([]);
   const [constructionQueue, setConstructionQueue] = useState<ConstructionItem[]>([]);
+  
+  // Global User Data
+  const [research, setResearch] = useState<Research[]>([]);
+  const [officers, setOfficers] = useState<Officer[]>([]);
   const [missions, setMissions] = useState<FleetMission[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
 
@@ -57,31 +60,49 @@ const App = () => {
   // --- INITIAL LOAD (Auth Check) ---
   useEffect(() => {
       api.getSession().then(user => {
-          if (user) loadUserData(user);
+          if (user) {
+              setCurrentUser(user);
+              loadPlanetData(user, user.currentPlanetId);
+          }
           setLoadingAuth(false);
       });
   }, []);
 
-  const loadUserData = (user: User) => {
-      setCurrentUser(user);
-      setResources(user.resources);
-      setBuildings(user.buildings);
+  const loadPlanetData = (user: User, planetId: string) => {
+      const p = user.planets.find(x => x.id === planetId) || user.planets[0];
+      if (!p) return;
+
+      setResources(p.resources);
+      setBuildings(p.buildings);
+      setFleet(p.fleet);
+      setDefenses(p.defenses);
+      setConstructionQueue(p.queue);
+
       setResearch(user.research);
-      setFleet(user.fleet);
-      setDefenses(user.defenses);
       setOfficers(user.officers);
-      setConstructionQueue(user.queue || []);
-      setMissions(user.missions || []);
-      setReports(user.reports || []);
+      setMissions(user.missions);
+      setReports(user.reports);
   };
 
   const handleLogin = (user: User) => {
-      loadUserData(user);
+      setCurrentUser(user);
+      loadPlanetData(user, user.currentPlanetId);
+  };
+
+  const handlePlanetChange = (planetId: string) => {
+      if (!currentUser) return;
+      // Force sync current state to old planet before switching
+      syncToBackend(); 
+      
+      const updatedUser = { ...currentUser, currentPlanetId: planetId };
+      setCurrentUser(updatedUser);
+      loadPlanetData(updatedUser, planetId);
   };
 
   // --- GAME LOOP ---
   useEffect(() => {
     if (!currentUser || !resources) return;
+    if (currentUser.vacationMode) return; // Stop loop in vacation mode
 
     const tickRate = 1000; 
     const interval = setInterval(() => {
@@ -91,6 +112,7 @@ const App = () => {
 
       // --- OFFICERS BONUSES ---
       const energyBonus = officers.find(o => o.id === 'off_celestin' && o.active) ? 1.1 : 1.0;
+      const currentPlanet = currentUser.planets.find(p => p.id === currentUser.currentPlanetId) || currentUser.planets[0];
 
       // --- PRODUCTION ---
       let producedKarma = 0;
@@ -99,7 +121,7 @@ const App = () => {
       buildings.forEach(b => {
         if (b.level === 0) return;
         if (b.energyType === 'producer' && b.production?.type === 'karma') {
-             producedKarma += getProduction(b.production.base, b.production.factor, b.level, 'karma') * energyBonus;
+             producedKarma += getProduction(b.production.base, b.production.factor, b.level, 'karma', currentPlanet.temperature) * energyBonus;
         }
         if (b.energyType === 'consumer' && b.consumption?.type === 'karma') {
           consumedKarma += getConsumption(b.consumption.base, b.consumption.factor, b.level);
@@ -120,7 +142,7 @@ const App = () => {
 
         buildings.forEach(b => {
           if (b.level > 0 && b.production) {
-            const amount = getProduction(b.production.base, b.production.factor, b.level, b.production.type) * deltaSeconds * efficiency;
+            const amount = getProduction(b.production.base, b.production.factor, b.level, b.production.type, currentPlanet.temperature) * deltaSeconds * efficiency;
             if (b.production.type === 'risitasium') newRis += amount;
             if (b.production.type === 'stickers') newSti += amount;
             if (b.production.type === 'sel') newSel += amount;
@@ -134,7 +156,7 @@ const App = () => {
           sel: newSel,
           karma: newKarma,
           karmaMax: producedKarma,
-          redpills: prev.redpills
+          redpills: prev.redpills // Keep global
         };
       });
 
@@ -155,6 +177,9 @@ const App = () => {
                   const nextItem = nextQueue[0];
                   nextQueue[0] = { ...nextItem, startTime: now, endTime: now + (nextItem.totalDuration * 1000) };
               }
+              // TRIGGER QUEST CHECK ON COMPLETION
+              checkQuests();
+              
               return nextQueue;
           }
           
@@ -200,25 +225,65 @@ const App = () => {
 
 
   // --- HELPERS ---
+  
+  const checkQuests = () => {
+      // Create a temporary user object with current state to check condition
+      const tempUser = { 
+          ...currentUser!, 
+          planets: currentUser!.planets.map(p => p.id === currentUser!.currentPlanetId ? {...p, buildings, fleet} : p),
+          research 
+      };
+
+      const newCompleted: string[] = [];
+      QUEST_DB.forEach(q => {
+          if (!tempUser.completedQuests.includes(q.id) && q.condition(tempUser)) {
+              newCompleted.push(q.id);
+              // Give reward
+              setResources(prev => {
+                  if(!prev) return null;
+                  return {
+                      ...prev,
+                      risitasium: prev.risitasium + (q.reward.risitasium || 0),
+                      stickers: prev.stickers + (q.reward.stickers || 0),
+                      sel: prev.sel + (q.reward.sel || 0),
+                      redpills: prev.redpills + (q.reward.redpills || 0),
+                  }
+              });
+              alert(`QUÊTE TERMINÉE : ${q.title} ! Récompense obtenue.`);
+          }
+      });
+      
+      if (newCompleted.length > 0) {
+          setCurrentUser(prev => prev ? ({...prev, completedQuests: [...prev.completedQuests, ...newCompleted]}) : null);
+      }
+  };
 
   const syncToBackend = () => {
       if (!currentUser || !resources) return;
+      
+      const currentPlanetIndex = currentUser.planets.findIndex(p => p.id === currentUser.currentPlanetId);
+      if (currentPlanetIndex !== -1) {
+          currentUser.planets[currentPlanetIndex] = {
+              ...currentUser.planets[currentPlanetIndex],
+              resources,
+              buildings,
+              fleet,
+              defenses,
+              queue: constructionQueue
+          };
+      }
+
       const updatedUser: User = {
           ...currentUser,
-          resources,
-          buildings,
           research,
-          fleet,
-          defenses,
           officers,
-          queue: constructionQueue,
           missions,
           reports
       };
       api.saveGameState(updatedUser);
   };
 
-  const processMissionArrival = (m: FleetMission) => {
+  const processMissionArrival = async (m: FleetMission) => {
       let newReport: Report = {
           id: Date.now().toString(),
           date: Date.now(),
@@ -238,12 +303,35 @@ const App = () => {
              let content = 'Vous avez écrasé la défense ennemie.';
              if (res.moonCreated) content += '\n\nUNE LUNE A ÉTÉ CRÉÉE !';
              
-             newReport = { ...newReport, title: 'Victoire !', content, loot };
+             await api.updateGalaxyDebris(m.target, { risitasium: Math.floor(res.debris * 0.7), stickers: Math.floor(res.debris * 0.3), sel: 0, karma:0, karmaMax:0, redpills:0 });
+
+             newReport = { ...newReport, title: 'Victoire !', content, loot, detailedCombat: res };
              returnFleet(m, loot);
           } else {
-             newReport = { ...newReport, title: 'Défaite...', content: 'Votre flotte a été anéantie.' };
+             newReport = { ...newReport, title: 'Défaite...', content: 'Votre flotte a été anéantie.', detailedCombat: res };
           }
       } 
+      else if (m.type === 'recycle') {
+          const capacity = Object.entries(m.fleet).reduce((acc, [id, count]) => {
+              const ship = SHIP_DB.find(s => s.id === id);
+              return acc + (ship ? ship.stats.capacity * count : 0);
+          }, 0);
+          
+          const harvested = await api.harvestDebris(m.target, capacity);
+          newReport = { ...newReport, type: 'recycle', title: 'Recyclage', content: `Vos recycleurs ont récupéré des débris sur ${m.target}.`, loot: harvested };
+          returnFleet(m, harvested);
+      }
+      else if (m.type === 'colonize') {
+          if (currentUser) {
+              const [g,s,p] = m.target.split(':').map(Number);
+              await api.colonizePlanet(currentUser, {g, s, p});
+              newReport = { ...newReport, type: 'colonize', title: 'Colonisation réussie', content: `Une nouvelle colonie a été fondée en [${m.target}].` };
+              // Fleet returns (or stays? simplified returns)
+              returnFleet(m);
+              // Force reload to see new planet
+              api.getSession().then(u => { if(u) setCurrentUser(u); });
+          }
+      }
       else if (m.type === 'expedition') {
           const rand = Math.random();
           if (rand > 0.3) {
@@ -255,10 +343,26 @@ const App = () => {
           }
       }
       else if (m.type === 'spy') {
-           newReport = { ...newReport, type: 'spy', title: 'Rapport d\'espionnage', content: `Ressources détectées sur ${m.target}: \nMétal: 12,400\nCristal: 4,000` };
+           // Better Spy Report based on tech difference
+           const spyLevel = research.find(r => r.id === 'espionnage')?.level || 0;
+           // Assume enemy spy level 3 for demo
+           const enemySpy = 3; 
+           const diff = spyLevel - enemySpy;
+           
+           let content = `Scan du secteur ${m.target}.\n`;
+           if (diff < 0) content += "Signal brouillé. Impossible d'analyser.";
+           else {
+               content += "Ressources: Métal: 12k, Cristal: 5k.\n";
+               if (diff >= 2) content += "Flotte: 50 Chasseurs Légers détectés.\n";
+               if (diff >= 3) content += "Défense: 10 Lanceurs de PLS.\n";
+               if (diff >= 5) content += "Bâtiments: Mine de Metal niv 20.\n";
+               if (diff >= 7) content += "Technologies: Laser niv 10.\n";
+           }
+
+           newReport = { ...newReport, type: 'spy', title: 'Rapport d\'espionnage', content };
            returnFleet(m);
       }
-      else if (m.type === 'transport' || m.type === 'recycle') {
+      else if (m.type === 'transport') {
            returnFleet(m);
       }
 
@@ -284,6 +388,13 @@ const App = () => {
     if (constructionQueue.length >= 2 || !resources) return; 
     const b = buildings.find(x => x.id === buildingId);
     if (!b) return;
+
+    // Check Fields
+    const currentPlanet = currentUser?.planets.find(p => p.id === currentUser.currentPlanetId);
+    if (currentPlanet && currentPlanet.fields.current >= currentPlanet.fields.max) {
+        alert("Planète pleine ! Terraformation requise.");
+        return;
+    }
 
     const inQueue = constructionQueue.find(item => item.id === buildingId);
     const levelToBuild = inQueue ? inQueue.targetLevel + 1 : b.level + 1;
@@ -351,6 +462,7 @@ const App = () => {
     if (resources.risitasium >= totalRis && resources.stickers >= totalSti && resources.sel >= totalSel) {
         setResources(prev => prev ? ({ ...prev, risitasium: prev.risitasium - totalRis, stickers: prev.stickers - totalSti, sel: prev.sel - totalSel }) : null);
         setDb((prev: any) => prev.map((unit: any) => unit.id === id ? { ...unit, count: unit.count + count } : unit));
+        checkQuests(); // Check fleet quests
     }
   };
 
@@ -364,7 +476,7 @@ const App = () => {
   const handleSendMission = (missionData: any) => {
       const shipsToRemove = missionData.fleet;
       setFleet(prev => prev.map(s => ({ ...s, count: s.count - (shipsToRemove[s.id] || 0) })));
-      setMissions(prev => [...prev, { ...missionData, id: Date.now().toString(), source: currentUser?.planetName || 'Colonie' }]);
+      setMissions(prev => [...prev, { ...missionData, id: Date.now().toString(), source: currentUser?.currentPlanetId || 'Colonie' }]); // Adjusted source
       setTab('overview');
   };
 
@@ -382,9 +494,12 @@ const App = () => {
 
   const handleRenamePlanet = (name: string) => {
       if(currentUser) {
-          const updated = { ...currentUser, planetName: name };
-          setCurrentUser(updated);
-          api.saveGameState(updated);
+          // Update local state name for display in overview
+          const updatedPlanets = currentUser.planets.map(p => p.id === currentUser.currentPlanetId ? {...p, name} : p);
+          // Removed legacy planetName property to fix TS error
+          const updatedUser = { ...currentUser, planets: updatedPlanets }; 
+          setCurrentUser(updatedUser);
+          api.saveGameState(updatedUser);
       }
   };
 
@@ -406,7 +521,8 @@ const App = () => {
   // --- RENDER ---
   if (loadingAuth) return <div className="min-h-screen bg-black flex items-center justify-center text-tech-gold animate-pulse">CHARGEMENT DU LIEN NEURAL...</div>;
   if (!currentUser || !resources) return <AuthView onLogin={handleLogin} />;
-
+  
+  // Update view props if needed
   const renderContent = () => {
     if (detailBuilding) {
       const currentB = buildings.find(b => b.id === detailBuilding.id) || detailBuilding;
@@ -414,7 +530,7 @@ const App = () => {
     }
 
     switch(tab) {
-      case 'overview': return <Overview resources={resources} planetName={currentUser.planetName} onRename={handleRenamePlanet} />;
+      case 'overview': return <Overview resources={resources} planetName={currentUser.planets.find(p => p.id === currentUser.currentPlanetId)?.name || 'Colonie'} onRename={handleRenamePlanet} user={currentUser} />;
       case 'buildings': return <Buildings buildings={buildings} resources={resources} onBuild={handleBuild} onShowDetail={setDetailBuilding} />;
       case 'techtree': return <TechTreeView buildings={buildings} research={research} fleet={fleet} />;
       case 'research': return <ResearchView research={research} buildings={buildings} resources={resources} onResearch={handleResearch} />;
@@ -428,7 +544,7 @@ const App = () => {
       case 'admin': return currentUser.isAdmin ? <AdminView /> : <UnderConstruction title="ACCÈS REFUSÉ" />;
       case 'simulator': return <SimulatorView />;
       case 'messages': return <MessagesView reports={reports} onRead={handleReadMessage} />;
-      case 'galaxy': return <GalaxyView onNavigate={handleNavigate} />;
+      case 'galaxy': return <GalaxyView onNavigate={handleNavigate} user={currentUser} />;
       case 'help': return <HelpView />;
       default: return <UnderConstruction title="SECTEUR INCONNU" />;
     }
@@ -446,6 +562,7 @@ const App = () => {
         buildings={buildings}
         queue={constructionQueue}
         user={currentUser}
+        onPlanetChange={handlePlanetChange}
       />
 
       <div className="fixed top-4 right-4 z-[60]">

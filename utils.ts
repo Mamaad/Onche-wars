@@ -1,6 +1,6 @@
 
-import { ResourceType, Ship, Defense, User, PointsBreakdown, Building, Research } from './types';
-import { BUILDING_DB, RESEARCH_DB, SHIP_DB, DEFENSE_DB } from './constants';
+import { ResourceType, Ship, Defense, User, PointsBreakdown, Building, Research, CombatRound, DetailedCombatReport } from './types';
+import { BUILDING_DB, RESEARCH_DB, SHIP_DB, DEFENSE_DB, RAPID_FIRE } from './constants';
 
 export const formatNumber = (num: number) => {
   if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
@@ -12,10 +12,38 @@ export const getCost = (base: number, factor: number, level: number) => {
   return Math.floor(base * Math.pow(factor, level));
 };
 
-export const getProduction = (base: number, factor: number, level: number, type?: ResourceType) => {
+export const getProduction = (base: number, factor: number, level: number, type?: ResourceType, temperature?: { min: number, max: number }) => {
   const raw = base * level * Math.pow(factor, level);
+  
+  // Temperature Logic
+  if (temperature) {
+      const avgTemp = (temperature.min + temperature.max) / 2;
+      
+      // Solar Plant: Better if hot
+      // Formula: Base * (1 + (AvgTemp / 100)) - simplified approximation needed?
+      // OGame: floor(30 * Level * (1.1 ^ Level) * (1 + AverageTemp / 200)) ? No standard is floor(20 * Level * 1.1^Level)
+      // Let's apply a bonus/malus based on temp for specific types
+      
+      if (type === 'karma') {
+          // Solar energy bonus up to +50% at 100°C, -50% at -100°C
+          const tempBonus = 1 + (avgTemp / 200);
+          return Math.floor(raw * Math.max(0.1, tempBonus));
+      }
+      
+      if (type === 'sel') {
+          // Deut (Sel) consumption/production affected by temp?
+          // OGame: Deut synth produces MORE in COLD planets.
+          // Formula: Base * Level * 1.1^Level * (1.44 - 0.004 * MaxTemp)
+          const tempFactor = 1.44 - 0.004 * temperature.max;
+          // But here we use 'raw' as input which already has base*lvl*factor. 
+          // So we adjust raw.
+          // Since our base formula is simpler, let's just add a modifier.
+          return Math.floor(raw * Math.max(0.1, tempFactor));
+      }
+  }
+
   if (type === 'karma') return Math.floor(raw);
-  return Math.floor(raw * 0.06);
+  return Math.floor(raw * 0.06); // Global Speed Factor
 };
 
 export const getConsumption = (base: number, factor: number, level: number) => {
@@ -23,7 +51,7 @@ export const getConsumption = (base: number, factor: number, level: number) => {
 };
 
 export const getConstructionTime = (costRis: number, costSti: number) => {
-  const seconds = (costRis + costSti) / 2500; // Accéléré pour le test
+  const seconds = (costRis + costSti) / 2500;
   return seconds < 1 ? 1 : Math.round(seconds);
 };
 
@@ -33,11 +61,7 @@ export const formatTime = (seconds: number) => {
   return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m`;
 };
 
-// --- POINTS CALCULATION (NEW SYSTEM) ---
-
-// Points = BasePoints * Level (pour Bâtiments et Recherche)
-// Points = BasePoints * Count (pour Flotte et Défense)
-// Economy Points (Secondaire) = 1 point / 1000 ressources dépensées
+// --- POINTS CALCULATION ---
 
 const calculateEconomyPoints = (baseCost: {risitasium: number, stickers: number, sel: number}, factor: number, level: number) => {
   let totalSpent = 0;
@@ -52,21 +76,41 @@ const calculateEconomyPoints = (baseCost: {risitasium: number, stickers: number,
 export const calculateUserPoints = (user: User): PointsBreakdown => {
   let p_build = 0;
   let p_eco_build = 0;
-  user.buildings.forEach(b => {
-     const db = BUILDING_DB.find(x => x.id === b.id);
-     if(db && b.level > 0) {
-        // Points de classement : Somme des points pour chaque niveau
-        // Exemple: Mine Niv 2 (Base 1). Niv 1 (1pt) + Niv 2 (2pts) = 3pts Total ??
-        // NON : Le user demande "Niveau 4 rapporte 1 pts, Niveau 5 rapporte 2 pts".
-        // Interprétation standard : Le "bâtiment au niveau X" vaut "Y points".
-        // Formule choisie : BasePoints * Niveau (linéaire simple) ou BasePoints * (Level^Factor) ?
-        // Restons simple : BasePoints * Level. Une mine lvl 10 (base 1) vaudra 10 pts. Une Etoile Noire (base 10000) vaudra 10000.
-        
-        p_build += (db.basePoints * b.level);
-        p_eco_build += calculateEconomyPoints(db.baseCost, db.costFactor, b.level);
-     }
+  let p_fleet = 0;
+  let p_eco_fleet = 0;
+  let p_defense = 0;
+  let p_eco_defense = 0;
+
+  // Points from Planets (Buildings, Fleet, Defense)
+  user.planets.forEach(planet => {
+      planet.buildings.forEach(b => {
+          const db = BUILDING_DB.find(x => x.id === b.id);
+          if(db && b.level > 0) {
+              p_build += (db.basePoints * b.level);
+              p_eco_build += calculateEconomyPoints(db.baseCost, db.costFactor, b.level);
+          }
+      });
+
+      planet.fleet.forEach(s => {
+          const db = SHIP_DB.find(x => x.id === s.id);
+          if(db && s.count > 0) {
+              p_fleet += (db.basePoints * s.count);
+              const unitCost = db.baseCost.risitasium + db.baseCost.stickers + db.baseCost.sel;
+              p_eco_fleet += Math.floor((unitCost * s.count) / 1000);
+          }
+      });
+
+      planet.defenses.forEach(d => {
+          const db = DEFENSE_DB.find(x => x.id === d.id);
+          if(db && d.count > 0) {
+              p_defense += (db.basePoints * d.count);
+              const unitCost = db.baseCost.risitasium + db.baseCost.stickers + db.baseCost.sel;
+              p_eco_defense += Math.floor((unitCost * d.count) / 1000);
+          }
+      });
   });
 
+  // Points from Account (Research)
   let p_research = 0;
   let p_eco_research = 0;
   user.research.forEach(r => {
@@ -75,30 +119,6 @@ export const calculateUserPoints = (user: User): PointsBreakdown => {
         p_research += (db.basePoints * r.level);
         p_eco_research += calculateEconomyPoints(db.baseCost, db.costFactor, r.level);
      }
-  });
-
-  let p_fleet = 0;
-  let p_eco_fleet = 0;
-  user.fleet.forEach(s => {
-      const db = SHIP_DB.find(x => x.id === s.id);
-      if(db && s.count > 0) {
-          p_fleet += (db.basePoints * s.count);
-          
-          const unitCost = db.baseCost.risitasium + db.baseCost.stickers + db.baseCost.sel;
-          p_eco_fleet += Math.floor((unitCost * s.count) / 1000);
-      }
-  });
-
-  let p_defense = 0;
-  let p_eco_defense = 0;
-  user.defenses.forEach(d => {
-      const db = DEFENSE_DB.find(x => x.id === d.id);
-      if(db && d.count > 0) {
-          p_defense += (db.basePoints * d.count);
-          
-          const unitCost = db.baseCost.risitasium + db.baseCost.stickers + db.baseCost.sel;
-          p_eco_defense += Math.floor((unitCost * d.count) / 1000);
-      }
   });
 
   return {
@@ -111,48 +131,169 @@ export const calculateUserPoints = (user: User): PointsBreakdown => {
   };
 };
 
-// Combat Simulator Logic (Simplified OGame style)
-export const calculateCombat = (attackerFleet: Ship[], defenderFleet: Ship[], defenses: Defense[]) => {
-  let attackerPower = attackerFleet.reduce((acc, s) => acc + (s.stats.attack * s.count), 0);
-  let attackerHull = attackerFleet.reduce((acc, s) => acc + (s.stats.hull * s.count), 0);
-  
-  let defenderPower = defenderFleet.reduce((acc, s) => acc + (s.stats.attack * s.count), 0) + 
-                      defenses.reduce((acc, d) => acc + (d.stats.attack * d.count), 0);
-                      
-  let defenderHull = defenderFleet.reduce((acc, s) => acc + (s.stats.hull * s.count), 0) +
-                     defenses.reduce((acc, d) => acc + (d.stats.hull * d.count), 0);
+// --- COMBAT SYSTEM V2 (Detailed) ---
 
-  // Random variations
-  attackerPower *= (0.8 + Math.random() * 0.4);
-  defenderPower *= (0.8 + Math.random() * 0.4);
+interface CombatEntity {
+    uuid: string;
+    id: string;
+    hull: number;
+    shield: number;
+    maxHull: number;
+    maxShield: number;
+    attack: number;
+    type: string;
+    rapidFire: { [key: string]: number };
+}
 
+export const calculateCombat = (attackerFleet: Ship[], defenderFleet: Ship[], defenses: Defense[]): DetailedCombatReport => {
+  // Expand fleet into individual units for simulation
+  let attackers: CombatEntity[] = [];
+  attackerFleet.forEach(s => {
+      for(let i=0; i<s.count; i++) attackers.push({ 
+          uuid: Math.random().toString(36),
+          id: s.id, 
+          hull: s.stats.hull, 
+          maxHull: s.stats.hull,
+          shield: s.stats.defense, 
+          maxShield: s.stats.defense,
+          attack: s.stats.attack, 
+          type: s.id,
+          rapidFire: s.stats.rapidFire || {}
+      });
+  });
+
+  let defenders: CombatEntity[] = [];
+  defenderFleet.forEach(s => {
+      for(let i=0; i<s.count; i++) defenders.push({ 
+          uuid: Math.random().toString(36),
+          id: s.id, 
+          hull: s.stats.hull, 
+          maxHull: s.stats.hull,
+          shield: s.stats.defense, 
+          maxShield: s.stats.defense,
+          attack: s.stats.attack, 
+          type: s.id,
+          rapidFire: s.stats.rapidFire || {}
+      });
+  });
+  defenses.forEach(d => {
+      for(let i=0; i<d.count; i++) defenders.push({ 
+          uuid: Math.random().toString(36),
+          id: d.id, 
+          hull: d.stats.hull, 
+          maxHull: d.stats.hull,
+          shield: d.stats.defense, 
+          maxShield: d.stats.defense,
+          attack: d.stats.attack, 
+          type: d.id,
+          rapidFire: {}
+      });
+  });
+
+  const roundsLog: CombatRound[] = [];
   const rounds = 6;
-  let winner = 'draw';
+  let winner: 'attacker' | 'defender' | 'draw' = 'draw';
   
-  // Simplified Battle: Apply damage to total hull
-  for (let i = 0; i < rounds; i++) {
-     defenderHull -= attackerPower / rounds;
-     attackerHull -= defenderPower / rounds;
+  const initialAttackerValue = attackers.reduce((a, b) => a + b.maxHull, 0); // Simplified value tracking
+  const initialDefenderValue = defenders.reduce((a, b) => a + b.maxHull, 0);
 
-     if (defenderHull <= 0) { winner = 'attacker'; break; }
-     if (attackerHull <= 0) { winner = 'defender'; break; }
+  // Helper to count ships by ID
+  const countShips = (entities: CombatEntity[]) => {
+      const counts: {[id: string]: number} = {};
+      entities.forEach(e => counts[e.id] = (counts[e.id] || 0) + 1);
+      return counts;
+  };
+
+  for (let r = 0; r < rounds; r++) {
+      if (attackers.length === 0) { winner = 'defender'; break; }
+      if (defenders.length === 0) { winner = 'attacker'; break; }
+
+      const startAttackerCount = countShips(attackers);
+      const startDefenderCount = countShips(defenders);
+
+      // Attackers shoot Defenders
+      processSalvo(attackers, defenders);
+      // Defenders shoot Attackers
+      processSalvo(defenders, attackers);
+
+      const endAttackerCount = countShips(attackers.filter(u => u.hull > 0));
+      const endDefenderCount = countShips(defenders.filter(u => u.hull > 0));
+
+      // Calculate losses for this round
+      const attackerLosses: any = {};
+      Object.keys(startAttackerCount).forEach(k => attackerLosses[k] = startAttackerCount[k] - (endAttackerCount[k] || 0));
+      
+      const defenderLosses: any = {};
+      Object.keys(startDefenderCount).forEach(k => defenderLosses[k] = startDefenderCount[k] - (endDefenderCount[k] || 0));
+
+      roundsLog.push({
+          round: r + 1,
+          attackerCount: startAttackerCount,
+          defenderCount: startDefenderCount,
+          attackerLosses,
+          defenderLosses
+      });
+
+      // Clean up dead units
+      attackers = attackers.filter(u => u.hull > 0);
+      defenders = defenders.filter(u => u.hull > 0);
+      
+      // Recharge Shields
+      attackers.forEach(u => u.shield = u.maxShield);
+      defenders.forEach(u => u.shield = u.maxShield);
   }
 
-  // Debris Calculation (30% of ships destroyed to debris)
-  // Simplified for this mock: Random debris based on fleet size
-  const totalFleetSize = attackerFleet.reduce((a,b)=>a+b.count,0) + defenderFleet.reduce((a,b)=>a+b.count,0);
-  const debris = Math.floor(totalFleetSize * 1000 * Math.random());
-  
-  // Moon Chance: 1% per 100,000 debris, max 20%
+  if (attackers.length > 0 && defenders.length === 0) winner = 'attacker';
+  else if (defenders.length > 0 && attackers.length === 0) winner = 'defender';
+  else winner = 'draw';
+
+  // Calculate Debris (30% of Hull lost)
+  const lostAttackerValue = initialAttackerValue - attackers.reduce((a, b) => a + b.maxHull, 0);
+  const lostDefenderValue = initialDefenderValue - defenders.reduce((a, b) => a + b.maxHull, 0);
+  const debris = Math.floor((lostAttackerValue + lostDefenderValue) * 0.3);
+
   const moonChance = Math.min(20, Math.floor(debris / 100000));
   const moonCreated = Math.random() * 100 < moonChance;
-  
-  return { 
-    winner, 
-    attackerRemaining: Math.max(0, attackerHull), 
-    defenderRemaining: Math.max(0, defenderHull),
-    moonCreated,
-    moonChance,
-    debris
+
+  return {
+      rounds: roundsLog,
+      winner,
+      debris,
+      moonCreated,
+      loot: { risitasium: 0, stickers: 0, sel: 0, karma: 0, karmaMax: 0, redpills: 0 } // Calculated later
   };
+};
+
+const processSalvo = (shooters: CombatEntity[], targets: CombatEntity[]) => {
+    shooters.forEach(shooter => {
+        let targetsToShoot = 1;
+        
+        while (targetsToShoot > 0 && targets.length > 0) {
+            const targetIndex = Math.floor(Math.random() * targets.length);
+            const target = targets[targetIndex];
+            
+            // Damage Logic
+            if (target.hull > 0) {
+                if (target.shield < shooter.attack) {
+                    const damage = shooter.attack - target.shield;
+                    target.hull -= damage;
+                    // Explosion logic simplified: if hull < 0, marked for death.
+                } else {
+                    // Shield absorbed it, maybe small damage? Simplified: absorbed.
+                    target.shield -= Math.floor(shooter.attack / 100); // Tiny shield damage
+                }
+            }
+
+            targetsToShoot--;
+
+            // Check RapidFire
+            const rfChance = shooter.rapidFire[target.type]; 
+            if (rfChance) {
+                const chance = (rfChance - 1) / rfChance;
+                if (Math.random() < chance) {
+                    targetsToShoot++;
+                }
+            }
+        }
+    });
 };

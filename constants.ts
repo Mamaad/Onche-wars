@@ -1,5 +1,5 @@
 
-import { Building, Resources, Research, Ship, Defense, Officer } from './types';
+import { Building, Resources, Research, Ship, Defense, Officer, Quest, User } from './types';
 
 export const INITIAL_RESOURCES: Resources = {
   risitasium: 500,
@@ -7,8 +7,47 @@ export const INITIAL_RESOURCES: Resources = {
   sel: 0,
   karma: 0,
   karmaMax: 0,
-  redpills: 50, // Un peu de monnaie premium offerte au départ
+  redpills: 50,
 };
+
+// RAPID FIRE MATRIX (Attacker -> Target: Probability/Count)
+export const RAPID_FIRE: { [attackerId: string]: { [targetId: string]: number } } = {
+    'croiseur': { 'chasseur_leger': 6, 'sonde': 5 },
+    'destructeur': { 'croiseur': 2, 'laser_gneugneu': 5 },
+    'etoile_noire': { 'croiseur': 10, 'vaisseau_bataille': 5, 'destructeur': 2 },
+    'chasseur_lourd': { 'transporteur': 3 },
+};
+
+export const QUEST_DB: Quest[] = [
+    {
+        id: 'q_start',
+        title: 'Première Pierre',
+        description: 'Construire une Mine de Risitium niveau 1.',
+        reward: { stickers: 200 },
+        condition: (u: User) => u.planets.some(p => p.buildings.find(b => b.id === 'mine_risitasium' && b.level >= 1))
+    },
+    {
+        id: 'q_power',
+        title: 'Lumière Divine',
+        description: 'Construire une Centrale Solaire niveau 1 pour alimenter vos mines.',
+        reward: { risitasium: 300 },
+        condition: (u: User) => u.planets.some(p => p.buildings.find(b => b.id === 'centrale_solaire' && b.level >= 1))
+    },
+    {
+        id: 'q_lab',
+        title: 'Science infuse',
+        description: 'Construire un Laboratoire de Recherche niveau 1.',
+        reward: { sel: 100 },
+        condition: (u: User) => u.planets.some(p => p.buildings.find(b => b.id === 'laboratoire_recherche' && b.level >= 1))
+    },
+    {
+        id: 'q_fleet',
+        title: 'Armada',
+        description: 'Posséder au moins 1 Chasseur Léger.',
+        reward: { redpills: 10 },
+        condition: (u: User) => u.planets.some(p => p.fleet.find(s => s.id === 'chasseur_leger' && s.count >= 1))
+    }
+];
 
 export const OFFICER_DB: Officer[] = [
   {
@@ -100,6 +139,30 @@ export const DEFENSE_DB: Defense[] = [
     stats: { attack: 3000, defense: 3000, hull: 10000, capacity: 0 },
     reqs: { 'chantier_spatial': 8, 'tech_plasma': 7 },
     image: 'https://images.unsplash.com/photo-1628126235206-5260b9ea6441?q=80&w=500&auto=format&fit=crop'
+  },
+  {
+    id: 'missile_interception',
+    name: 'Missile d\'Interception',
+    description: 'Détruit les Missiles Interplanétaires ennemis en vol.',
+    count: 0,
+    baseCost: { risitasium: 8000, stickers: 0, sel: 2000 },
+    costFactor: 1,
+    basePoints: 10,
+    stats: { attack: 1, defense: 1, hull: 1, capacity: 0 },
+    reqs: { 'silo_missiles': 2 },
+    image: 'https://images.unsplash.com/photo-1550482645-8c0c45167b0b?q=80&w=500&auto=format&fit=crop'
+  },
+  {
+    id: 'missile_interplanetaire',
+    name: 'Missile Interplanétaire',
+    description: 'Détruit les défenses adverses à distance.',
+    count: 0,
+    baseCost: { risitasium: 12500, stickers: 2500, sel: 10000 },
+    costFactor: 1,
+    basePoints: 25,
+    stats: { attack: 12000, defense: 1, hull: 1, capacity: 0 },
+    reqs: { 'silo_missiles': 4, 'moteur_impulsion': 1 },
+    image: 'https://images.unsplash.com/photo-1609605776950-57577884d565?q=80&w=500&auto=format&fit=crop'
   }
 ];
 
@@ -212,6 +275,34 @@ export const BUILDING_DB: Building[] = [
     consumption: { type: 'karma', base: 0, factor: 1 },
     reqs: { 'usine_golems': 2 },
     image: 'https://images.unsplash.com/photo-1614728853970-309140b774cf?q=80&w=500&auto=format&fit=crop',
+  },
+  {
+    id: 'silo_missiles',
+    name: 'Silo de Missiles',
+    description: 'Stockage pour missiles.',
+    longDescription: 'Structure souterraine renforcée permettant le stockage et le lancement de missiles interplanétaires et d\'interception.',
+    level: 0,
+    baseCost: { risitasium: 20000, stickers: 20000, sel: 1000 },
+    costFactor: 2,
+    basePoints: 20,
+    energyType: 'consumer',
+    consumption: { type: 'karma', base: 0, factor: 1 },
+    reqs: { 'chantier_spatial': 1 },
+    image: 'https://images.unsplash.com/photo-1517411032315-54ef2cb00966?q=80&w=500&auto=format&fit=crop',
+  },
+  {
+    id: 'phalange_capteur',
+    name: 'Phalange de Capteur',
+    description: 'Scanner longue portée.',
+    longDescription: 'Réseau de capteurs haute sensibilité capable de détecter les mouvements de flotte sur les planètes voisines.',
+    level: 0,
+    baseCost: { risitasium: 20000, stickers: 40000, sel: 20000 },
+    costFactor: 2,
+    basePoints: 50,
+    energyType: 'consumer',
+    consumption: { type: 'karma', base: 100, factor: 1.5 },
+    reqs: { 'laboratoire_recherche': 10, 'tech_energie': 10 }, // Normalement sur Lune, ici simplifié
+    image: 'https://images.unsplash.com/photo-1614728263952-84ea2563bc10?q=80&w=500&auto=format&fit=crop',
   }
 ];
 
@@ -348,6 +439,28 @@ export const RESEARCH_DB: Research[] = [
     reqs: { 'laboratoire_recherche': 6, 'tech_energie': 3 },
     image: 'https://images.unsplash.com/photo-1517480447814-2396e9877114?q=80&w=500&auto=format&fit=crop',
   },
+  {
+    id: 'astrophysique',
+    name: 'Astrophysique',
+    description: 'Permet de découvrir et coloniser de nouveaux mondes.',
+    level: 0,
+    baseCost: { risitasium: 4000, stickers: 8000, sel: 4000 },
+    costFactor: 2,
+    basePoints: 40,
+    reqs: { 'laboratoire_recherche': 3, 'espionnage': 4, 'moteur_impulsion': 3 },
+    image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=500&auto=format&fit=crop',
+  },
+  {
+    id: 'graviton',
+    name: 'Technologie Graviton',
+    description: 'Nécessaire pour l\'Étoile Noire. Requiert une énergie colossale.',
+    level: 0,
+    baseCost: { risitasium: 0, stickers: 0, sel: 0 }, // Fake cost, needs energy check in logic
+    costFactor: 3,
+    basePoints: 1000,
+    reqs: { 'laboratoire_recherche': 12 },
+    image: 'https://images.unsplash.com/photo-1505322022379-7c3353ee6291?q=80&w=500&auto=format&fit=crop',
+  }
 ];
 
 export const SHIP_DB: Ship[] = [
@@ -388,6 +501,18 @@ export const SHIP_DB: Ship[] = [
     image: 'https://images.unsplash.com/photo-1563089145-599997674d42?q=80&w=500&auto=format&fit=crop',
   },
   {
+    id: 'transporteur',
+    name: 'Transporteur Universel',
+    description: 'Indispensable pour déplacer des ressources.',
+    count: 0,
+    baseCost: { risitasium: 4000, stickers: 4000, sel: 0 },
+    costFactor: 1,
+    basePoints: 8,
+    stats: { attack: 5, defense: 10, hull: 1200, capacity: 25000 },
+    reqs: { 'chantier_spatial': 2, 'moteur_combustion': 2 },
+    image: 'https://images.unsplash.com/photo-1586775490184-b79f0621891f?q=80&w=500&auto=format&fit=crop',
+  },
+  {
     id: 'croiseur',
     name: 'Modo-Croiseur',
     description: 'Vaisseau rapide capable de calmer les chasseurs.',
@@ -395,7 +520,7 @@ export const SHIP_DB: Ship[] = [
     baseCost: { risitasium: 20000, stickers: 7000, sel: 2000 },
     costFactor: 1,
     basePoints: 29,
-    stats: { attack: 400, defense: 100, hull: 2700, capacity: 800 },
+    stats: { attack: 400, defense: 100, hull: 2700, capacity: 800, rapidFire: RAPID_FIRE['croiseur'] },
     reqs: { 'chantier_spatial': 7, 'moteur_impulsion': 4, 'tech_ions': 2 },
     image: 'https://images.unsplash.com/photo-1550747545-c896b5f89304?q=80&w=500&auto=format&fit=crop',
   },
@@ -455,7 +580,7 @@ export const SHIP_DB: Ship[] = [
     baseCost: { risitasium: 60000, stickers: 50000, sel: 15000 },
     costFactor: 1,
     basePoints: 125,
-    stats: { attack: 2000, defense: 2000, hull: 11000, capacity: 2000 },
+    stats: { attack: 2000, defense: 2000, hull: 11000, capacity: 2000, rapidFire: RAPID_FIRE['destructeur'] },
     reqs: { 'chantier_spatial': 9, 'moteur_hyperspace': 6, 'tech_hyperespace': 5 },
     image: 'https://images.unsplash.com/photo-1533742493393-27715f573752?q=80&w=500&auto=format&fit=crop',
   },
@@ -467,7 +592,7 @@ export const SHIP_DB: Ship[] = [
     baseCost: { risitasium: 5000000, stickers: 4000000, sel: 1000000 },
     costFactor: 1,
     basePoints: 10000,
-    stats: { attack: 200000, defense: 50000, hull: 900000, capacity: 1000000 },
+    stats: { attack: 200000, defense: 50000, hull: 900000, capacity: 1000000, rapidFire: RAPID_FIRE['etoile_noire'] },
     reqs: { 'chantier_spatial': 12, 'moteur_hyperspace': 7, 'tech_hyperespace': 6, 'graviton': 1 },
     image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=500&auto=format&fit=crop',
   },

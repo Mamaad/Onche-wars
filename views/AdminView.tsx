@@ -18,10 +18,29 @@ export const AdminView = () => {
     };
 
     const handleGiveRes = (id: string) => {
-        api.adminUpdateUser(id, { 
-            resources: { risitasium: 1000000, stickers: 1000000, sel: 1000000, karma: 1000, karmaMax: 1000, redpills: 1000 }
+        const user = users.find(u => u.id === id);
+        if (!user) return;
+        
+        // Give resources to the first planet or current planet
+        const targetPlanetId = user.currentPlanetId || user.planets[0]?.id;
+        const newPlanets = user.planets.map(p => {
+             if(p.id === targetPlanetId) {
+                 return {
+                     ...p,
+                     resources: { risitasium: 1000000, stickers: 1000000, sel: 1000000, karma: 1000, karmaMax: 1000, redpills: 1000 }
+                 }
+             }
+             return p;
         });
-        alert('Ressources envoyées.');
+
+        api.adminUpdateUser(id, { 
+            planets: newPlanets
+        });
+        
+        // Optimistically update local state
+        setUsers(users.map(u => u.id === id ? { ...u, planets: newPlanets } : u));
+        
+        alert('Ressources envoyées sur la planète active.');
     };
 
     return (
@@ -38,7 +57,7 @@ export const AdminView = () => {
                     <TechCard key={u.id} className="p-4 flex items-center justify-between border-slate-800">
                         <div>
                             <div className="font-bold text-white">{u.username} <span className="text-slate-500 text-xs">({u.id})</span></div>
-                            <div className="text-xs text-slate-400 font-mono">{u.email || 'No Email'} | Planète: {u.planetName}</div>
+                            <div className="text-xs text-slate-400 font-mono">{u.email || 'No Email'} | Planète: {u.planets.find(p => p.id === u.currentPlanetId)?.name || 'Inconnue'}</div>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => handleGiveRes(u.id)} className="p-2 bg-blue-900/30 text-blue-400 border border-blue-900 rounded hover:bg-blue-900">

@@ -1,8 +1,24 @@
-
 import React from 'react';
 
-export const TechCard = ({ children, className = "", onClick }: { children?: React.ReactNode, className?: string, onClick?: (e?: any) => void }) => (
-  <div onClick={onClick} className={`relative bg-space-black/60 backdrop-blur-md border border-slate-800 shadow-xl overflow-hidden group ${className} ${onClick ? 'cursor-pointer' : ''}`}>
+export const TechCard = ({ 
+  children, 
+  className = "", 
+  onClick, 
+  onMouseEnter, 
+  onMouseLeave 
+}: { 
+  children?: React.ReactNode, 
+  className?: string, 
+  onClick?: (e?: any) => void,
+  onMouseEnter?: () => void,
+  onMouseLeave?: () => void 
+}) => (
+  <div 
+    onClick={onClick}
+    onMouseEnter={onMouseEnter}
+    onMouseLeave={onMouseLeave}
+    className={`relative bg-space-black/60 backdrop-blur-md border border-slate-800 shadow-xl overflow-hidden group ${className} ${onClick ? 'cursor-pointer' : ''}`}
+  >
     <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-tech-gold/50"></div>
     <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-tech-gold/50"></div>
     <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-tech-gold/50"></div>
