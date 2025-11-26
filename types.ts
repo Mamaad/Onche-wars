@@ -8,6 +8,9 @@ export interface Resources {
   karma: number;
   karmaMax: number;
   redpills: number; // Global resource usually, but kept here for simplicity
+  maxRis?: number; // UI helper
+  maxSti?: number; // UI helper
+  maxSel?: number; // UI helper
 }
 
 export interface Cost {
@@ -113,7 +116,7 @@ export interface DetailedCombatReport {
 
 export interface Report {
   id: string;
-  type: 'combat' | 'spy' | 'expedition' | 'colonize' | 'recycle' | 'missile';
+  type: 'combat' | 'spy' | 'expedition' | 'colonize' | 'recycle' | 'missile' | 'transport';
   title: string;
   content: string;
   date: number;
@@ -204,4 +207,16 @@ export interface Alliance {
   image?: string;
   recruitment: AllianceRecruitmentState;
   applications: AllianceApplication[];
+}
+
+export interface TradeOffer {
+    id: string;
+    sellerId: string;
+    sellerName: string;
+    type: 'sell' | 'buy'; // Seller wants to sell or buy? (Simplification: Seller SELLS resource A for resource B)
+    offeredResource: ResourceType;
+    offeredAmount: number;
+    requestedResource: ResourceType;
+    requestedAmount: number;
+    date: number;
 }

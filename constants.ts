@@ -12,10 +12,10 @@ export const INITIAL_RESOURCES: Resources = {
 
 // RAPID FIRE MATRIX (Attacker -> Target: Probability/Count)
 export const RAPID_FIRE: { [attackerId: string]: { [targetId: string]: number } } = {
-    'croiseur': { 'chasseur_leger': 6, 'sonde': 5 },
-    'destructeur': { 'croiseur': 2, 'laser_gneugneu': 5 },
-    'etoile_noire': { 'croiseur': 10, 'vaisseau_bataille': 5, 'destructeur': 2 },
-    'chasseur_lourd': { 'petit_transporteur': 3 },
+    'croiseur': { 'chasseur_leger': 6, 'sonde': 5, 'satellite_solaire': 5 },
+    'destructeur': { 'croiseur': 2, 'laser_gneugneu': 5, 'satellite_solaire': 5 },
+    'etoile_noire': { 'croiseur': 10, 'vaisseau_bataille': 5, 'destructeur': 2, 'satellite_solaire': 100 },
+    'chasseur_lourd': { 'petit_transporteur': 3, 'satellite_solaire': 5 },
 };
 
 export const QUEST_DB: Quest[] = [
@@ -212,7 +212,7 @@ export const BUILDING_DB: Building[] = [
     basePoints: 3,
     baseTime: 15,
     timeFactor: 1.6,
-    production: { type: 'sel', base: 10, factor: 1.1 },
+    production: { type: 'sel', base: 8, factor: 1.1 }, // Lower base production to make it harder (Stickers is 20)
     energyType: 'consumer',
     consumption: { type: 'karma', base: 20, factor: 1.1 },
     image: 'https://images.unsplash.com/photo-1518337231011-7b24300e84b6?q=80&w=500&auto=format&fit=crop',
@@ -305,8 +305,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 400, stickers: 120, sel: 200 },
     costFactor: 2,
     basePoints: 10,
-    baseTime: 300,
-    timeFactor: 1.65,
+    baseTime: 150, // 2min 30s (Divided by 2 from original 5min)
+    timeFactor: 1.65, // Reverted to original curve
     energyType: 'consumer',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=500&auto=format&fit=crop',
     percentage: 100,
@@ -320,8 +320,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 1000, stickers: 2000, sel: 1000 }, 
     costFactor: 2,
     basePoints: 10,
-    baseTime: 300,
-    timeFactor: 1.5,
+    baseTime: 150, // 2min 30s
+    timeFactor: 1.5, // Reverted
     energyType: 'consumer',
     image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=500&auto=format&fit=crop',
     percentage: 100,
@@ -335,8 +335,8 @@ export const BUILDING_DB: Building[] = [
     baseCost: { risitasium: 2000, stickers: 1000, sel: 500 },
     costFactor: 2,
     basePoints: 10,
-    baseTime: 300,
-    timeFactor: 1.6,
+    baseTime: 150, // 2min 30s
+    timeFactor: 1.6, // Reverted
     energyType: 'consumer',
     reqs: { 'usine_golems': 2 },
     image: 'https://images.unsplash.com/photo-1614728853970-309140b774cf?q=80&w=500&auto=format&fit=crop',
@@ -598,7 +598,7 @@ export const SHIP_DB: Ship[] = [
     baseCost: { risitasium: 20000, stickers: 7000, sel: 2000 },
     costFactor: 1,
     basePoints: 29,
-    stats: { attack: 400, defense: 50, hull: 2700, capacity: 800, rapidFire: { 'chasseur_leger': 6, 'sonde': 5 } },
+    stats: { attack: 400, defense: 50, hull: 2700, capacity: 800, rapidFire: { 'chasseur_leger': 6, 'sonde': 5, 'satellite_solaire': 5 } },
     reqs: { 'chantier_spatial': 5, 'moteur_impulsion': 4, 'tech_ions': 2 },
     image: 'https://images.unsplash.com/photo-1605218427306-635ba243971c?q=80&w=500&auto=format&fit=crop',
   },
@@ -624,7 +624,7 @@ export const SHIP_DB: Ship[] = [
     baseCost: { risitasium: 60000, stickers: 50000, sel: 15000 },
     costFactor: 1,
     basePoints: 125,
-    stats: { attack: 2000, defense: 500, hull: 11000, capacity: 2000, rapidFire: { 'croiseur': 2, 'laser_gneugneu': 5 } },
+    stats: { attack: 2000, defense: 500, hull: 11000, capacity: 2000, rapidFire: { 'croiseur': 2, 'laser_gneugneu': 5, 'satellite_solaire': 5 } },
     reqs: { 'chantier_spatial': 9, 'moteur_hyperspace': 6, 'tech_hyperspace': 5 },
     image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=500&auto=format&fit=crop',
   },
@@ -637,7 +637,7 @@ export const SHIP_DB: Ship[] = [
     baseCost: { risitasium: 5000000, stickers: 4000000, sel: 1000000 },
     costFactor: 1,
     basePoints: 10000,
-    stats: { attack: 200000, defense: 50000, hull: 9000000, capacity: 1000000, rapidFire: { 'croiseur': 10, 'vaisseau_bataille': 5, 'destructeur': 2 } },
+    stats: { attack: 200000, defense: 50000, hull: 9000000, capacity: 1000000, rapidFire: { 'croiseur': 10, 'vaisseau_bataille': 5, 'destructeur': 2, 'satellite_solaire': 100 } },
     reqs: { 'chantier_spatial': 12, 'moteur_hyperspace': 7, 'graviton': 1 },
     image: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=500&auto=format&fit=crop',
   },
@@ -705,5 +705,18 @@ export const SHIP_DB: Ship[] = [
     stats: { attack: 0, defense: 0, hull: 100, capacity: 5, rapidFire: {} },
     reqs: { 'chantier_spatial': 3, 'moteur_combustion': 3, 'espionnage': 2 },
     image: 'https://images.unsplash.com/photo-1517976487492-5750f3195933?q=80&w=500&auto=format&fit=crop',
+  },
+  {
+    id: 'satellite_solaire',
+    name: 'Satellite Solaire',
+    description: 'Produit de l\'énergie en orbite.',
+    longDescription: 'Déployés en haute orbite, ces satellites captent directement l\'énergie solaire brute. Indispensable pour l\'énergie d\'appoint ou le Graviton.',
+    count: 0,
+    baseCost: { risitasium: 0, stickers: 2000, sel: 500 },
+    costFactor: 1,
+    basePoints: 1,
+    stats: { attack: 0, defense: 0, hull: 200, capacity: 0, rapidFire: {} },
+    reqs: { 'chantier_spatial': 1 },
+    image: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?q=80&w=500&auto=format&fit=crop',
   }
 ];

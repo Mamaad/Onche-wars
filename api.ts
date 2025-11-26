@@ -1,5 +1,5 @@
 
-import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Alliance, Planet, AllianceRecruitmentState, AllianceApplication } from './types';
+import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Alliance, Planet, AllianceRecruitmentState, AllianceApplication, TradeOffer } from './types';
 import { INITIAL_RESOURCES, BUILDING_DB, RESEARCH_DB, SHIP_DB, DEFENSE_DB, OFFICER_DB } from './constants';
 import { calculateUserPoints } from './utils';
 
@@ -7,7 +7,8 @@ import { calculateUserPoints } from './utils';
 
 const DB_KEY = 'onche_wars_db_users';
 const ALLIANCE_KEY = 'onche_wars_db_alliances';
-const GALAXY_KEY = 'onche_wars_db_galaxy'; // Stores debris, etc.
+const GALAXY_KEY = 'onche_wars_db_galaxy';
+const MARKET_KEY = 'onche_wars_db_market'; // NEW
 const SESSION_KEY = 'onche_wars_session';
 
 const getDB = (): User[] => {
@@ -37,20 +38,31 @@ export const saveGalaxyDB = (data: any) => {
     localStorage.setItem(GALAXY_KEY, JSON.stringify(data));
 };
 
+const getMarketDB = (): TradeOffer[] => {
+    const data = localStorage.getItem(MARKET_KEY);
+    // MOCK DATA IF EMPTY
+    if (!data || JSON.parse(data).length === 0) {
+        const mocks: TradeOffer[] = [
+            { id: 'm1', sellerId: 'ai_1', sellerName: 'Marchand_IA', type: 'sell', offeredResource: 'risitasium', offeredAmount: 5000, requestedResource: 'stickers', requestedAmount: 2500, date: Date.now() },
+            { id: 'm2', sellerId: 'ai_2', sellerName: 'Empire_Stark', type: 'sell', offeredResource: 'sel', offeredAmount: 1000, requestedResource: 'risitasium', requestedAmount: 4000, date: Date.now() - 100000 },
+        ];
+        localStorage.setItem(MARKET_KEY, JSON.stringify(mocks));
+        return mocks;
+    }
+    return JSON.parse(data);
+};
+
+const saveMarketDB = (offers: TradeOffer[]) => {
+    localStorage.setItem(MARKET_KEY, JSON.stringify(offers));
+};
+
 // --- PLANET GENERATION LOGIC ---
 const createPlanet = (id: string, name: string, g: number, s: number, p: number): Planet => {
-    // Temperature Formula based on Position
-    // Pos 1: Hot (~200°C), Pos 15: Cold (~-100°C)
-    // Avg Temp = 140 - 10 * pos + random variation
     const baseTemp = 140 - (p * 10);
     const variation = Math.floor(Math.random() * 40) - 20;
     const maxTemp = baseTemp + variation;
     const minTemp = maxTemp - 40;
 
-    // Fields Formula
-    // Gaussian distribution around 163 fields + random
-    // Simplified: Base 163 + random(-30, +60)
-    // Specific positions (1, 2, 3, 13, 14, 15) are smaller
     let baseFields = 163;
     if (p <= 3 || p >= 13) baseFields = 100;
     const fields = Math.floor(baseFields + (Math.random() * 60) - 20);
@@ -145,16 +157,13 @@ export const api = {
         const users = getDB();
         const index = users.findIndex(u => u.id === user.id);
         if (index !== -1) {
-            // Update fields count usage
             user.planets.forEach(p => {
                 p.fields.current = p.buildings.reduce((acc, b) => acc + b.level, 0);
             });
-            // Recalculate points on save
             const points = calculateUserPoints(user);
             users[index] = { ...user, points, lastUpdate: Date.now() };
             saveDB(users);
             
-            // Also update alliance points if in alliance
             if (user.allianceId) {
                 api.recalculateAlliancePoints(user.allianceId);
             }
@@ -191,7 +200,6 @@ export const api = {
             saveGalaxyDB(gal);
             return { ...harvested, karma:0, karmaMax:0, redpills:0 };
         } else {
-            // Partial harvest
             const ratio = capacity / total;
             const harvested = {
                 risitasium: Math.floor(d.risitasium * ratio),
@@ -206,19 +214,16 @@ export const api = {
         }
     },
 
-    // --- NEW MECHANICS ---
-    
-    // NOOB PROTECTION CHECK
     canAttack: async (attacker: User, targetCoords: string): Promise<{allowed: boolean, reason?: string}> => {
         const users = getDB();
         const targetPlanet = users.flatMap(u => u.planets).find(p => `${p.coords.g}:${p.coords.s}:${p.coords.p}` === targetCoords);
-        if (!targetPlanet) return { allowed: true }; // Attack empty space or aliens?
+        if (!targetPlanet) return { allowed: true };
 
         const defender = users.find(u => u.planets.some(p => p.id === targetPlanet.id));
         if (!defender) return { allowed: true };
 
         if (defender.vacationMode) return { allowed: false, reason: "Mode Vacances actif." };
-        if (attacker.isAdmin) return { allowed: true }; // Admin bypass
+        if (attacker.isAdmin) return { allowed: true };
 
         const ratio = attacker.points.total / Math.max(1, defender.points.total);
         if (attacker.points.total > 5000 && defender.points.total < 5000) {
@@ -231,9 +236,7 @@ export const api = {
         return { allowed: true };
     },
 
-    // SENSOR PHALANX
     scanPhalanx: async (user: User, targetCoords: string): Promise<{success: boolean, missions?: FleetMission[], error?: string}> => {
-        // Check if user has Phalanx on current planet
         const currentP = user.planets.find(p => p.id === user.currentPlanetId);
         if (!currentP) return { success: false, error: "Planète erreur" };
         
@@ -241,21 +244,16 @@ export const api = {
         if (!phalanx || phalanx.level === 0) return { success: false, error: "Pas de Phalange de Capteur." };
 
         const [tG, tS] = targetCoords.split(':').map(Number);
-        
-        // Range check: (Level)^2 - 1 systems
         const range = Math.pow(phalanx.level, 2) - 1;
         if (currentP.coords.g !== tG || Math.abs(currentP.coords.s - tS) > range) {
             return { success: false, error: "Hors de portée." };
         }
 
-        // Cost
         if (currentP.resources.sel < 5000) return { success: false, error: "Pas assez de Sel (5000)." };
         
-        // Deduct cost and save
         user.planets = user.planets.map(p => p.id === currentP.id ? {...p, resources: {...p.resources, sel: p.resources.sel - 5000}} : p);
         api.saveGameState(user);
 
-        // Find missions
         const users = getDB();
         const allMissions = users.flatMap(u => u.missions);
         const relevantMissions = allMissions.filter(m => m.target === targetCoords || m.source === targetCoords);
@@ -263,7 +261,6 @@ export const api = {
         return { success: true, missions: relevantMissions };
     },
 
-    // MISSILE ATTACK
     fireMissiles: async (attacker: User, targetCoords: string, amount: number, primaryTarget: string): Promise<{success: boolean, report?: string, error?: string}> => {
         const currentP = attacker.planets.find(p => p.id === attacker.currentPlanetId);
         if (!currentP) return { success: false, error: "Planète erreur" };
@@ -274,7 +271,6 @@ export const api = {
         const mip = currentP.defenses.find(d => d.id === 'missile_interplanetaire');
         if (!mip || mip.count < amount) return { success: false, error: "Pas assez de missiles." };
 
-        // Range Formula: (Impulse Drive Level * 5) - 1 
         const impulse = attacker.research.find(r => r.id === 'moteur_impulsion')?.level || 0;
         const range = (impulse * 5) - 1;
         
@@ -283,11 +279,9 @@ export const api = {
             return { success: false, error: "Cible hors de portée." };
         }
 
-        // EXECUTE ATTACK
         const users = getDB();
         const defender = users.find(u => u.planets.some(p => `${p.coords.g}:${p.coords.s}:${p.coords.p}` === targetCoords));
         
-        // Consume missiles
         attacker.planets.find(p => p.id === currentP.id)!.defenses.find(d => d.id === 'missile_interplanetaire')!.count -= amount;
         
         if (!defender) {
@@ -297,7 +291,6 @@ export const api = {
 
         const targetPlanet = defender.planets.find(p => `${p.coords.g}:${p.coords.s}:${p.coords.p}` === targetCoords)!;
         
-        // Interceptors?
         const interceptors = targetPlanet.defenses.find(d => d.id === 'missile_interception');
         let intercepted = 0;
         if (interceptors && interceptors.count > 0) {
@@ -309,22 +302,15 @@ export const api = {
         let damageLog = `Missiles lancés: ${amount}. Interceptés: ${intercepted}.\n`;
 
         if (hits > 0) {
-            // Damage calculation: simplified. Each missile destroys X structure points of defense.
-            // Say 1 missile = 50 structure damage (low for testing).
-            // Actually OGame formula: MIP destroys structure. 
-            // Let's say 1 MIP destroys 20 units of 'lanceur_pls' equiv.
-            let damageBudget = hits * 2000; // arbitrary damage points
-            
-            // Prioritize primary target
+            let damageBudget = hits * 2000; 
             const primaryDef = targetPlanet.defenses.find(d => d.id === primaryTarget);
             if (primaryDef && primaryDef.count > 0) {
-                const destroyed = Math.min(primaryDef.count, Math.floor(damageBudget / (primaryDef.baseCost.risitasium / 100))); // approx cost
+                const destroyed = Math.min(primaryDef.count, Math.floor(damageBudget / (primaryDef.baseCost.risitasium / 100)));
                 primaryDef.count -= destroyed;
                 damageBudget -= destroyed * (primaryDef.baseCost.risitasium / 100);
                 damageLog += `${destroyed} ${primaryDef.name} détruits.\n`;
             }
             
-            // Splash damage
             if (damageBudget > 0) {
                 targetPlanet.defenses.forEach(d => {
                     if (damageBudget <= 0 || d.id === primaryTarget) return;
@@ -338,11 +324,9 @@ export const api = {
             damageLog += "Tous les missiles ont été interceptés.";
         }
 
-        // Save states
         api.saveGameState(attacker);
-        api.saveGameState(defender); // Need to save defender too (we are simulating backend here)
+        api.saveGameState(defender); 
 
-        // Send Report to Defender
         const defReport: Report = {
             id: Date.now().toString() + 'def',
             type: 'missile',
@@ -357,8 +341,6 @@ export const api = {
         return { success: true, report: damageLog };
     },
 
-
-    // ALLIANCE SYSTEM
     getAlliances: async (): Promise<Alliance[]> => {
         return getAlliancesDB();
     },
@@ -381,8 +363,6 @@ export const api = {
         const freshFounder = users.find(u => u.id === founder.id);
         if (!freshFounder) return { success: false, error: "Utilisateur introuvable." };
         if (freshFounder.allianceId) return { success: false, error: "Vous êtes déjà dans une alliance." };
-        
-        // STRICT POINTS CHECK
         if (freshFounder.points.total < 1000) return { success: false, error: "1000 points requis." };
 
         const alliances = getAlliancesDB();
@@ -396,7 +376,7 @@ export const api = {
             name,
             founderId: founder.id,
             members: [founder.id],
-            description: "Bienvenue dans notre alliance. Modifiez cette description dans l'administration.",
+            description: "Bienvenue dans notre alliance.",
             creationDate: Date.now(),
             points: freshFounder.points.total,
             recruitment: 'open',
@@ -406,7 +386,6 @@ export const api = {
         alliances.push(newAlly);
         saveAlliancesDB(alliances);
 
-        // Update User
         const uIdx = users.findIndex(u => u.id === founder.id);
         if (uIdx !== -1) {
             users[uIdx].allianceId = newAlly.id;
@@ -459,11 +438,9 @@ export const api = {
         const application = alliances[allyIdx].applications[appIdx];
 
         if (accept) {
-            // Add user to alliance
             alliances[allyIdx].members.push(application.userId);
-            alliances[allyIdx].points += application.points; // Approx update, real calc later
+            alliances[allyIdx].points += application.points; 
             
-            // Update User
             const users = getDB();
             const uIdx = users.findIndex(u => u.id === application.userId);
             if (uIdx !== -1) {
@@ -472,11 +449,8 @@ export const api = {
             }
         }
 
-        // Remove application in both cases
         alliances[allyIdx].applications.splice(appIdx, 1);
         saveAlliancesDB(alliances);
-        
-        // Recalc exact points
         api.recalculateAlliancePoints(allianceId);
         return { success: true };
     },
@@ -517,7 +491,6 @@ export const api = {
         if (allyIdx !== -1) {
             alliances[allyIdx].members = alliances[allyIdx].members.filter(id => id !== user.id);
             alliances[allyIdx].points -= user.points.total;
-            // if last member, delete alliance logic could go here
             saveAlliancesDB(alliances);
         }
 
@@ -547,5 +520,101 @@ export const api = {
             users[idx] = { ...users[idx], ...data };
             saveDB(users);
         }
+    },
+
+    // --- MARKET API ---
+    getMarketOffers: async (): Promise<TradeOffer[]> => {
+        return getMarketDB();
+    },
+
+    createTradeOffer: async (user: User, offer: Omit<TradeOffer, 'id' | 'sellerId' | 'sellerName' | 'date'>): Promise<{success: boolean, error?: string}> => {
+        const currentP = user.planets.find(p => p.id === user.currentPlanetId);
+        if (!currentP) return { success: false, error: "Erreur planète." };
+
+        // Check resources
+        if (currentP.resources[offer.offeredResource] < offer.offeredAmount) {
+            return { success: false, error: "Ressources insuffisantes." };
+        }
+
+        // Deduct resources immediately (Escrow)
+        currentP.resources[offer.offeredResource] -= offer.offeredAmount;
+        
+        const newOffer: TradeOffer = {
+            id: Date.now().toString(),
+            sellerId: user.id,
+            sellerName: user.username,
+            date: Date.now(),
+            ...offer
+        };
+
+        const offers = getMarketDB();
+        offers.push(newOffer);
+        saveMarketDB(offers);
+        
+        // Save user state with deducted resources
+        await api.saveGameState(user);
+
+        return { success: true };
+    },
+
+    acceptTradeOffer: async (buyer: User, offerId: string): Promise<{success: boolean, error?: string}> => {
+        const offers = getMarketDB();
+        const offerIdx = offers.findIndex(o => o.id === offerId);
+        if (offerIdx === -1) return { success: false, error: "Offre expirée." };
+        const offer = offers[offerIdx];
+
+        if (offer.sellerId === buyer.id) {
+            // Cancel offer logic
+            const currentP = buyer.planets.find(p => p.id === buyer.currentPlanetId);
+            if (currentP) {
+                currentP.resources[offer.offeredResource] += offer.offeredAmount;
+                offers.splice(offerIdx, 1);
+                saveMarketDB(offers);
+                await api.saveGameState(buyer);
+                return { success: true };
+            }
+            return { success: false, error: "Erreur ref." };
+        }
+
+        const currentP = buyer.planets.find(p => p.id === buyer.currentPlanetId);
+        if (!currentP) return { success: false, error: "Erreur planète." };
+
+        // Check buyer funds
+        if (currentP.resources[offer.requestedResource] < offer.requestedAmount) {
+            return { success: false, error: "Fonds insuffisants." };
+        }
+
+        // TRANSACTION
+        // 1. Deduct from Buyer
+        currentP.resources[offer.requestedResource] -= offer.requestedAmount;
+        // 2. Add goods to Buyer
+        currentP.resources[offer.offeredResource] += offer.offeredAmount;
+        
+        // 3. Credit Seller (Simulated, normally async)
+        const users = getDB();
+        const seller = users.find(u => u.id === offer.sellerId);
+        if (seller) {
+            // Ideally find which planet posted it, simplified: give to first planet
+            seller.planets[0].resources[offer.requestedResource] += offer.requestedAmount;
+            
+            // Send message to seller
+            const report: Report = {
+                id: Date.now().toString(),
+                type: 'transport',
+                title: 'Commerce terminé',
+                content: `Votre offre a été acceptée par ${buyer.username}. Vous avez reçu ${offer.requestedAmount} ${offer.requestedResource}.`,
+                date: Date.now(),
+                read: false
+            };
+            seller.reports.unshift(report);
+            saveDB(users); // Save seller update
+        }
+
+        // Remove offer
+        offers.splice(offerIdx, 1);
+        saveMarketDB(offers);
+        await api.saveGameState(buyer);
+
+        return { success: true };
     }
 };

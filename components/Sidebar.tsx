@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull, LucideChevronDown, LucideSettings2 } from 'lucide-react';
 import { TechCard } from './TechCard';
 import { Building, ConstructionItem, User } from '../types';
@@ -15,6 +15,14 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
     user: User,
     onPlanetChange?: (id: string) => void
 }) => {
+  const [now, setNow] = useState(Date.now());
+
+  // Update timer for progress bar
+  useEffect(() => {
+      const interval = setInterval(() => setNow(Date.now()), 1000);
+      return () => clearInterval(interval);
+  }, []);
+
   const hasBuilding = (id: string) => buildings.find((x: Building) => x.id === id && x.level > 0);
   
   const safeQueue = queue || [];
@@ -29,7 +37,7 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
     { id: 'galaxy', label: 'GALAXIE', icon: <LucideGlobe />, visible: true },
     { id: 'alliance', label: 'ALLIANCE', icon: <LucideHandshake />, visible: true },
     { id: 'officers', label: 'OFFICIERS', icon: <LucideUser />, visible: true },
-    { id: 'merchant', label: 'MARCHÉ NOIR', icon: <LucideBriefcase />, visible: true },
+    { id: 'merchant', label: 'COMMERCE', icon: <LucideBriefcase />, visible: true }, // Renamed
     { id: 'highscore', label: 'CLASSEMENT', icon: <LucideTrophy />, visible: true },
     { id: 'techtree', label: 'ARBRE TECH', icon: <LucideNetwork />, visible: true },
     { id: 'resources', label: 'RÉCAPITULATIF', icon: <LucideSettings2 />, visible: true },
@@ -58,7 +66,47 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
         fixed top-20 bottom-0 left-0 w-72 bg-space-black/95 border-r border-slate-800 transition-transform duration-300 z-40 overflow-y-auto backdrop-blur-xl flex flex-col
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
       `}>
-        <div className="flex-1 flex flex-col p-6 gap-2">
+        {/* QUEUE SECTION MOVED TO TOP */}
+        <div className="p-6 pb-2 border-b border-slate-800/50">
+           <TechCard className="p-4 bg-black/40">
+              <p className="font-display text-xs text-slate-500 uppercase mb-2 flex justify-between items-center">
+                <span>File de construction</span>
+                <span className="text-xs font-mono">{safeQueue.length}/2</span>
+              </p>
+              
+              {safeQueue.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Active Item */}
+                  <div className="text-sm text-tech-gold font-mono">
+                    <div className="flex justify-between">
+                      <span className="truncate max-w-[120px]">{getQueueName(safeQueue[0])}</span>
+                      <span>{formatTime(Math.max(0, (safeQueue[0].endTime - now) / 1000))}</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1 mt-1 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-tech-gold h-full transition-all duration-1000 ease-linear" 
+                        style={{
+                            width: `${Math.min(100, Math.max(0, ((now - safeQueue[0].startTime) / (safeQueue[0].totalDuration * 1000)) * 100))}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Queued Item */}
+                  {safeQueue[1] && (
+                    <div className="text-xs text-slate-500 font-mono border-t border-slate-800 pt-2 flex justify-between items-center">
+                       <span className="truncate max-w-[120px]">{getQueueName(safeQueue[1])}</span>
+                       <span className="bg-slate-800 px-1 rounded text-[10px]">EN ATTENTE</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-600 italic">Systèmes inactifs.</p>
+              )}
+            </TechCard>
+        </div>
+
+        <div className="flex-1 flex flex-col p-6 pt-4 gap-2">
           <div className="text-center pb-6 border-b border-slate-800/50 mb-4 relative">
              <div className="absolute inset-0 bg-radial-glow opacity-30 pointer-events-none"></div>
              
@@ -110,39 +158,6 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
         </div>
           
         <div className="p-6 pt-2 bg-slate-900/30 border-t border-slate-800">
-           {/* Queue Display */}
-           <TechCard className="p-4 bg-black/40 mb-4">
-              <p className="font-display text-xs text-slate-500 uppercase mb-2 flex justify-between items-center">
-                <span>File de construction</span>
-                <span className="text-xs font-mono">{safeQueue.length}/2</span>
-              </p>
-              
-              {safeQueue.length > 0 ? (
-                <div className="space-y-3">
-                  {/* Active Item */}
-                  <div className="text-sm text-tech-gold font-mono">
-                    <div className="flex justify-between">
-                      <span className="truncate max-w-[120px]">{getQueueName(safeQueue[0])}</span>
-                      <span>{formatTime(Math.max(0, (safeQueue[0].endTime - Date.now()) / 1000))}</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-1 mt-1 rounded-full overflow-hidden">
-                      <div className="bg-tech-gold h-full animate-pulse" style={{width: '60%'}}></div>
-                    </div>
-                  </div>
-
-                  {/* Queued Item */}
-                  {safeQueue[1] && (
-                    <div className="text-xs text-slate-500 font-mono border-t border-slate-800 pt-2 flex justify-between items-center">
-                       <span className="truncate max-w-[120px]">{getQueueName(safeQueue[1])}</span>
-                       <span className="bg-slate-800 px-1 rounded text-[10px]">EN ATTENTE</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-600 italic">Systèmes inactifs.</p>
-              )}
-            </TechCard>
-
             <button
                 onClick={() => { setTab('help'); setMobileOpen(false); }}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded border transition-all duration-300

@@ -25,7 +25,7 @@ import { OfficerClubView } from './views/OfficerClubView';
 import { SimulatorView } from './views/SimulatorView';
 import { MessagesView } from './views/MessagesView';
 import { HelpView } from './views/HelpView';
-import { MerchantView } from './views/MerchantView';
+import { MarketView } from './views/MarketView'; // UPDATED
 import { HighscoreView } from './views/HighscoreView';
 import { AllianceView } from './views/AllianceView';
 import { AdminView } from './views/AdminView';
@@ -131,9 +131,9 @@ const App = () => {
       const maxSti = getStorageCapacity(hangarSti);
       const maxSel = getStorageCapacity(hangarSel);
 
+      // Building Energy
       buildings.forEach(b => {
         if (b.level === 0) return;
-        // Use Percentage
         const percent = b.percentage || 100;
         
         if (b.energyType === 'producer' && b.production?.type === 'karma') {
@@ -143,6 +143,13 @@ const App = () => {
           consumedKarma += getConsumption(b.consumption.base, b.consumption.factor, b.level, percent);
         }
       });
+
+      // Solar Satellite Energy
+      const sats = fleet.find(s => s.id === 'satellite_solaire');
+      if (sats && sats.count > 0) {
+          const satEnergy = sats.count * Math.floor(30 * (1 + (currentPlanet.temperature.max / 200)));
+          producedKarma += satEnergy;
+      }
       
       const availableKarma = producedKarma - consumedKarma;
       const efficiency = availableKarma < 0 && producedKarma > 0 
@@ -240,7 +247,7 @@ const App = () => {
     }, tickRate);
 
     return () => clearInterval(interval);
-  }, [currentUser, buildings, constructionQueue, missions, officers, resources]);
+  }, [currentUser, buildings, constructionQueue, missions, officers, resources, fleet]);
 
 
   // --- HELPERS ---
@@ -346,9 +353,7 @@ const App = () => {
               const [g,s,p] = m.target.split(':').map(Number);
               await api.colonizePlanet(currentUser, {g, s, p});
               newReport = { ...newReport, type: 'colonize', title: 'Colonisation réussie', content: `Une nouvelle colonie a été fondée en [${m.target}].` };
-              // Fleet returns (or stays? simplified returns)
               returnFleet(m);
-              // Force reload to see new planet
               api.getSession().then(u => { if(u) setCurrentUser(u); });
           }
       }
@@ -363,9 +368,7 @@ const App = () => {
           }
       }
       else if (m.type === 'spy') {
-           // Better Spy Report based on tech difference
            const spyLevel = research.find(r => r.id === 'espionnage')?.level || 0;
-           // Assume enemy spy level 3 for demo
            const enemySpy = 3; 
            const diff = spyLevel - enemySpy;
            
@@ -425,7 +428,6 @@ const App = () => {
     const stiCost = getCost(b.baseCost.stickers, b.costFactor, levelToBuild - 1);
     const selCost = getCost(b.baseCost.sel, b.costFactor, levelToBuild - 1);
     
-    // New Time Calculation
     const time = getConstructionTime(b.baseTime || 60, b.timeFactor || 1.5, levelToBuild, roboticsLevel);
 
     if (resources.risitasium >= risCost && resources.stickers >= stiCost && resources.sel >= selCost) {
@@ -452,7 +454,6 @@ const App = () => {
     const t = research.find(x => x.id === techId);
     if (!t) return;
     
-    // Lab Research Speed
     const roboticsLevel = buildings.find(b => b.id === 'laboratoire_recherche')?.level || 0;
 
     const inQueue = constructionQueue.find(item => item.id === techId);
@@ -461,7 +462,6 @@ const App = () => {
     const stiCost = getCost(t.baseCost.stickers, t.costFactor, levelToBuild - 1);
     const selCost = getCost(t.baseCost.sel, t.costFactor, levelToBuild - 1);
     
-    // New Time Calculation for Research
     const time = getConstructionTime(t.baseTime || 100, t.timeFactor || 1.5, levelToBuild, roboticsLevel); 
 
     if (resources.risitasium >= risCost && resources.stickers >= stiCost && resources.sel >= selCost) {
@@ -504,8 +504,18 @@ const App = () => {
 
   const handleSendMission = (missionData: any) => {
       const shipsToRemove = missionData.fleet;
+      const fuelCost = Math.abs(missionData.resources.sel || 0);
+      
+      setResources(prev => {
+          if (!prev) return null;
+          return { ...prev, sel: prev.sel - fuelCost };
+      });
+
       setFleet(prev => prev.map(s => ({ ...s, count: s.count - (shipsToRemove[s.id] || 0) })));
-      setMissions(prev => [...prev, { ...missionData, id: Date.now().toString(), source: currentUser?.currentPlanetId || 'Colonie' }]); // Adjusted source
+      
+      const cleanMission = { ...missionData, resources: { risitasium: 0, stickers: 0, sel: 0 }, id: Date.now().toString(), source: currentUser?.currentPlanetId || 'Colonie' };
+      
+      setMissions(prev => [...prev, cleanMission]);
       setTab('overview');
   };
 
@@ -523,9 +533,7 @@ const App = () => {
 
   const handleRenamePlanet = (name: string) => {
       if(currentUser) {
-          // Update local state name for display in overview
           const updatedPlanets = currentUser.planets.map(p => p.id === currentUser.currentPlanetId ? {...p, name} : p);
-          // Removed legacy planetName property to fix TS error
           const updatedUser = { ...currentUser, planets: updatedPlanets }; 
           setCurrentUser(updatedUser);
           api.saveGameState(updatedUser);
@@ -559,7 +567,6 @@ const App = () => {
   const renderContent = () => {
     if (detailBuilding) {
       const currentB = buildings.find(b => b.id === detailBuilding.id) || detailBuilding;
-      // Find Robotics Level for display calculation in detail
       const roboticsLevel = buildings.find(b => b.id === 'usine_golems')?.level || 0;
       return <BuildingDetail building={currentB} onBack={() => setDetailBuilding(null)} currentResources={resources} roboticsLevel={roboticsLevel} />;
     }
@@ -572,9 +579,9 @@ const App = () => {
       case 'research': return <ResearchView research={research} buildings={buildings} resources={resources} onResearch={handleResearch} />;
       case 'shipyard': return <ShipyardView fleet={fleet} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(fleet, setFleet, id, c)} />;
       case 'defense': return <DefenseView defenses={defenses} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(defenses, setDefenses, id, c)} />;
-      case 'fleet': return <FleetView fleet={fleet} missions={missions} onSendMission={handleSendMission} initialTarget={fleetParams?.target} initialMission={fleetParams?.mission} />;
+      case 'fleet': return <FleetView fleet={fleet} missions={missions} onSendMission={handleSendMission} initialTarget={fleetParams?.target} initialMission={fleetParams?.mission} resources={resources} />;
       case 'officers': return <OfficerClubView officers={officers} resources={resources} onRecruit={handleRecruit} />;
-      case 'merchant': return <MerchantView resources={resources} onTrade={handleTrade} />;
+      case 'merchant': return <MarketView resources={resources} onTrade={handleTrade} user={currentUser} />; // CHANGED
       case 'highscore': return <HighscoreView />;
       case 'alliance': return <AllianceView />;
       case 'admin': return currentUser.isAdmin ? <AdminView /> : <UnderConstruction title="ACCÈS REFUSÉ" />;

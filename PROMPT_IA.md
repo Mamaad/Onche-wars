@@ -16,37 +16,35 @@
 *   **Flotte & Chantier :** Construction de vaisseaux et défenses. Temps de construction réduit par l'Usine de Golems.
 *   **Galaxie :** Vue système solaire (générée procéduralement), espionnage, attaque, missile.
 *   **Combats :** Moteur de combat simulé (6 tours, bouclier, coque, rapid fire).
+*   **Commerce :** Place du marché (P2P) et Marché Noir (NPC).
 *   **Interface :** UI "Cyberpunk/Space", responsive, scanlines, effets sonores visuels.
 
 ## 3. Modifications Récentes (À conserver)
-1.  **Énergie :** Seules les Mines (Risitium, Stickers, Sel) consomment de l'énergie. Les autres bâtiments sont passifs.
-2.  **Stockage :** 
-    *   Plafond de ressources implémenté (Bloque la prod si atteint).
-    *   Bâtiments Hangar ajoutés (`hangar_risitasium`, etc.).
-    *   Formule capacité : `50000 * 1.6^(lvl-1)`.
-3.  **Vitesse :**
-    *   Temps de construction augmenté drastiquement (Diviseur 500 au lieu de 2500).
-    *   Formule : `(Coût / 500) * (1 / (NiveauUsineGolems + 1))`.
+1.  **Énergie :** Seules les Mines (Risitium, Stickers, Sel) consomment de l'énergie. Les autres bâtiments sont passifs. Satellites Solaires fonctionnels.
+2.  **Stockage :** Plafond de ressources implémenté.
+3.  **Vitesse :** Temps de construction ajustés (Installations plus rapides au début).
+4.  **Commerce :** Système d'offres P2P ajouté dans `api.ts` (simulé).
 
 ## 4. Objectifs pour la Prochaine IA (Backend Migration)
-Le code actuel est 100% côté client (vulnérable à la triche, pas de vrai multijoueur). Ta mission est de migrer la logique vers un vrai backend.
+Le code actuel est 100% côté client. La priorité absolue est la migration backend.
 
 ### A. Stack Backend requise
 *   **Node.js / Express** (ou NestJS).
 *   **MariaDB** (SQL).
 *   **ORM :** TypeORM ou Prisma.
+*   **Socket.io :** Pour le temps réel (Chat, Notifications d'attaque).
 
 ### B. Tâches Prioritaires
 1.  **Modélisation BDD :**
-    *   Créer les tables `users`, `planets`, `buildings`, `fleets`, `reports`.
-    *   Les données statiques (`constants.ts`) doivent rester dans le code ou aller en BDD config.
+    *   Créer les tables `users`, `planets`, `buildings`, `fleets`, `reports`, `trade_offers`.
 2.  **Migration API :**
     *   Remplacer les appels `localStorage` dans `api.ts` par des `fetch()` vers le backend.
-    *   Créer les endpoints d'authentification (JWT).
 3.  **Logique Serveur (Anti-Cheat) :**
-    *   Le calcul des ressources (`App.tsx -> useEffect`) doit être validé par le serveur lors d'une action.
-    *   Le serveur doit calculer les deltas de temps (`lastUpdate` vs `now`) pour créditer les ressources.
-    *   Les combats doivent être résolus côté serveur.
+    *   Validation stricte des ressources et des temps de construction.
+4.  **Implémentation WebSockets :**
+    *   Le client React doit se connecter via `socket.io-client`.
+    *   Le serveur doit push les événements : "Attaque Entrante", "Message Reçu", "Mise à jour Marché".
+    *   *Note:* Impossible à faire en client-only actuel.
 
 ### C. Déploiement
 *   Suivre le fichier `DEPLOYMENT.md` présent à la racine pour l'installation sur le serveur Ubuntu (IP: 51.77.211.21, Port: 1000).

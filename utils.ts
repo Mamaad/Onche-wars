@@ -70,6 +70,17 @@ export const formatTime = (seconds: number) => {
   return `${Math.floor(seconds/86400)}j ${Math.floor((seconds%86400)/3600)}h`;
 };
 
+export const calculateFuelConsumption = (fleet: {[id: string]: number}, distance: number) => {
+    // Simple Formula: 10 + (TotalCapacity / 5000) * Distance (1 System = 1 Unit Distance)
+    let totalCapacity = 0;
+    Object.entries(fleet).forEach(([id, count]) => {
+        const ship = SHIP_DB.find(s => s.id === id);
+        if (ship) totalCapacity += ship.stats.capacity * count;
+    });
+    
+    return Math.floor(10 + (totalCapacity / 5000) * distance);
+};
+
 // --- POINTS CALCULATION ---
 
 const calculateEconomyPoints = (baseCost: {risitasium: number, stickers: number, sel: number}, factor: number, level: number) => {

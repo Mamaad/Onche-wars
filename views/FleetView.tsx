@@ -1,16 +1,18 @@
+
 import React, { useState, useEffect } from 'react';
-import { LucideRocket, LucideCrosshair, LucideMapPin, LucideClock, LucideTruck } from 'lucide-react';
+import { LucideRocket, LucideCrosshair, LucideMapPin, LucideClock, LucideTruck, LucideAtom } from 'lucide-react';
 import { Ship, FleetMission, Resources } from '../types';
 import { TechCard } from '../components/TechCard';
 import { TechButton } from '../components/TechButton';
-import { formatNumber, formatTime } from '../utils';
+import { formatNumber, formatTime, calculateFuelConsumption } from '../utils';
 
-export const FleetView = ({ fleet, missions, onSendMission, initialTarget, initialMission }: { 
+export const FleetView = ({ fleet, missions, onSendMission, initialTarget, initialMission, resources }: { 
     fleet: Ship[], 
     missions: FleetMission[], 
     onSendMission: (mission: Partial<FleetMission>) => void,
     initialTarget?: {g: number, s: number, p: number},
-    initialMission?: string
+    initialMission?: string,
+    resources: Resources
 }) => {
   const [selectedShips, setSelectedShips] = useState<{[id: string]: number}>({});
   const [target, setTarget] = useState({ g: 1, s: 42, p: 1 });
@@ -33,15 +35,23 @@ export const FleetView = ({ fleet, missions, onSendMission, initialTarget, initi
 
   const selectedCount = Object.values(selectedShips).reduce((a: number, b: number) => a + b, 0);
 
+  // Calculate Distance & Fuel
+  const distance = Math.abs(target.s - 42) + 5; // Mock distance logic relative to system 42
+  const fuelCost = calculateFuelConsumption(selectedShips, distance);
+
   const handleSend = () => {
+    if (resources.sel < fuelCost) {
+        alert("Pas assez de Sel pour le carburant !");
+        return;
+    }
+
     onSendMission({
         type: missionType as any,
         fleet: selectedShips,
         target: `${target.g}:${target.s}:${target.p}`,
         startTime: Date.now(),
-        // Distance calculation simplified: 1 system = 10 seconds
-        arrivalTime: Date.now() + (Math.abs(target.s - 42) * 1000 + 10000), 
-        resources: { risitasium: 0, stickers: 0, sel: 0 } 
+        arrivalTime: Date.now() + (distance * 1000 + 10000), 
+        resources: { risitasium: 0, stickers: 0, sel: -fuelCost } // Deduct fuel via negative resource hack or handle in App
     });
     setSelectedShips({});
   };
@@ -116,13 +126,22 @@ export const FleetView = ({ fleet, missions, onSendMission, initialTarget, initi
                 ))}
             </div>
 
-            <TechButton 
-                onClick={handleSend} 
-                disabled={selectedCount === 0} 
-                className="w-full mt-auto py-3"
-            >
-                <LucideRocket className="inline-block mr-2" size={16}/> LANCER LA FLOTTE
-            </TechButton>
+            <div className="mt-auto space-y-2">
+                <div className="flex justify-between items-center bg-black/30 p-2 rounded border border-slate-800">
+                    <span className="text-xs text-slate-400 flex items-center gap-1"><LucideAtom size={12}/> Conso. Carburant</span>
+                    <span className={`text-sm font-mono font-bold ${resources.sel >= fuelCost ? 'text-green-400' : 'text-red-500'}`}>
+                        {formatNumber(fuelCost)} Sel
+                    </span>
+                </div>
+
+                <TechButton 
+                    onClick={handleSend} 
+                    disabled={selectedCount === 0 || resources.sel < fuelCost} 
+                    className="w-full py-3"
+                >
+                    <LucideRocket className="inline-block mr-2" size={16}/> LANCER LA FLOTTE
+                </TechButton>
+            </div>
         </TechCard>
       </div>
 

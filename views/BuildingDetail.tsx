@@ -9,6 +9,8 @@ export const BuildingDetail = ({ building, onBack, currentResources, roboticsLev
   const levels = [];
   const isResourceProducer = building.energyType === 'consumer' && building.production;
   const isStorage = building.id.startsWith('hangar_') || building.id === 'reservoir_sel';
+  const hasProduction = building.production || isStorage;
+  const hasConsumption = building.consumption;
 
   for (let i = 1; i <= 10; i++) {
     const lvl = building.level + i;
@@ -76,12 +78,16 @@ export const BuildingDetail = ({ building, onBack, currentResources, roboticsLev
             <thead className="bg-slate-900/80 text-xs uppercase text-slate-500 border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4">Niveau</th>
-                <th className="px-6 py-4 text-right">
-                  {levels[0]?.prodLabel || 'Gain'}
-                </th>
-                <th className="px-6 py-4 text-right">
-                  {building.consumption?.type === 'karma' ? 'Conso. Énergie' : 'Consommation'}
-                </th>
+                {hasProduction && (
+                    <th className="px-6 py-4 text-right">
+                    {levels[0]?.prodLabel || 'Gain'}
+                    </th>
+                )}
+                {hasConsumption && (
+                    <th className="px-6 py-4 text-right">
+                    {building.consumption?.type === 'karma' ? 'Conso. Énergie' : 'Consommation'}
+                    </th>
+                )}
                 <th className="px-6 py-4 text-right">Temps Requis</th>
               </tr>
             </thead>
@@ -89,14 +95,18 @@ export const BuildingDetail = ({ building, onBack, currentResources, roboticsLev
               {levels.map((row) => (
                 <tr key={row.lvl} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 font-bold text-tech-blue">LVL {row.lvl}</td>
-                  <td className="px-6 py-4 text-right text-green-400 font-bold">
-                    {(building.production || isStorage)
-                      ? (isStorage ? formatNumber(row.prod) : `+${formatNumber(isResourceProducer ? row.prod * 3600 : row.prod)}`)
-                      : <span className="text-slate-700">-</span>}
-                  </td>
-                  <td className="px-6 py-4 text-right text-red-400">
-                    {building.consumption ? `-${formatNumber(row.cons)}` : <span className="text-slate-700">-</span>}
-                  </td>
+                  {hasProduction && (
+                      <td className="px-6 py-4 text-right text-green-400 font-bold">
+                        {(building.production || isStorage)
+                        ? (isStorage ? formatNumber(row.prod) : `+${formatNumber(isResourceProducer ? row.prod * 3600 : row.prod)}`)
+                        : <span className="text-slate-700">-</span>}
+                      </td>
+                  )}
+                  {hasConsumption && (
+                      <td className="px-6 py-4 text-right text-red-400">
+                        {building.consumption ? `-${formatNumber(row.cons)}` : <span className="text-slate-700">-</span>}
+                      </td>
+                  )}
                   <td className="px-6 py-4 text-right text-slate-400">{formatTime(row.time)}</td>
                 </tr>
               ))}
