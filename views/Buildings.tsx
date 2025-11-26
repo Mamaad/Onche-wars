@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { LucideZap, LucidePickaxe, LucideInfo, LucideActivity } from 'lucide-react';
 import { Building, Resources } from '../types';
@@ -6,6 +7,10 @@ import { TechCard } from '../components/TechCard';
 import { TechButton } from '../components/TechButton';
 
 export const Buildings = ({ buildings, resources, onBuild, onShowDetail }: any) => {
+  
+  // Calculate Robotics Level
+  const roboticsLevel = buildings.find((b: any) => b.id === 'usine_golems')?.level || 0;
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="border-b border-slate-800 pb-4">
@@ -18,7 +23,8 @@ export const Buildings = ({ buildings, resources, onBuild, onShowDetail }: any) 
           const risCost = getCost(b.baseCost.risitasium, b.costFactor, b.level);
           const stiCost = getCost(b.baseCost.stickers, b.costFactor, b.level);
           const selCost = getCost(b.baseCost.sel, b.costFactor, b.level);
-          const constructionTime = getConstructionTime(risCost, stiCost);
+          // Pass roboticsLevel here
+          const constructionTime = getConstructionTime(risCost, stiCost, roboticsLevel);
 
           const canAfford = 
             resources.risitasium >= risCost && 

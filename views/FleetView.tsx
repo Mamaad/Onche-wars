@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { LucideRocket, LucideCrosshair, LucideMapPin, LucideClock, LucideTruck } from 'lucide-react';
 import { Ship, FleetMission, Resources } from '../types';
@@ -32,7 +31,7 @@ export const FleetView = ({ fleet, missions, onSendMission, initialTarget, initi
       return acc + (ship.stats.capacity * count);
   }, 0);
 
-  const selectedCount = Object.values(selectedShips).reduce((a, b) => a + b, 0);
+  const selectedCount = Object.values(selectedShips).reduce((a: number, b: number) => a + b, 0);
 
   const handleSend = () => {
     onSendMission({

@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Resources, Building, Research, Ship, Defense, Officer, ConstructionItem, FleetMission, Report, Planet, DetailedCombatReport } from './types';
-import { getCost, getProduction, getConsumption, getConstructionTime, calculateCombat } from './utils';
+import { getCost, getProduction, getConsumption, getConstructionTime, calculateCombat, getStorageCapacity } from './utils';
 import { api } from './api';
 import { SHIP_DB, DEFENSE_DB, QUEST_DB } from './constants';
 
@@ -28,6 +29,7 @@ import { MerchantView } from './views/MerchantView';
 import { HighscoreView } from './views/HighscoreView';
 import { AllianceView } from './views/AllianceView';
 import { AdminView } from './views/AdminView';
+import { ResourceSettingsView } from './views/ResourceSettingsView';
 import { UnderConstruction } from './views/UnderConstruction';
 
 const App = () => {
@@ -73,7 +75,9 @@ const App = () => {
       if (!p) return;
 
       setResources(p.resources);
-      setBuildings(p.buildings);
+      // Ensure buildings have percentage property (migration fix)
+      const hydratedBuildings = p.buildings.map(b => ({...b, percentage: b.percentage !== undefined ? b.percentage : 100}));
+      setBuildings(hydratedBuildings);
       setFleet(p.fleet);
       setDefenses(p.defenses);
       setConstructionQueue(p.queue);
@@ -118,13 +122,25 @@ const App = () => {
       let producedKarma = 0;
       let consumedKarma = 0;
       
+      // Calculate Storage Limits
+      const hangarRis = buildings.find(b => b.id === 'hangar_risitasium')?.level || 0;
+      const hangarSti = buildings.find(b => b.id === 'hangar_stickers')?.level || 0;
+      const hangarSel = buildings.find(b => b.id === 'reservoir_sel')?.level || 0;
+      
+      const maxRis = getStorageCapacity(hangarRis);
+      const maxSti = getStorageCapacity(hangarSti);
+      const maxSel = getStorageCapacity(hangarSel);
+
       buildings.forEach(b => {
         if (b.level === 0) return;
+        // Use Percentage
+        const percent = b.percentage || 100;
+        
         if (b.energyType === 'producer' && b.production?.type === 'karma') {
-             producedKarma += getProduction(b.production.base, b.production.factor, b.level, 'karma', currentPlanet.temperature) * energyBonus;
+             producedKarma += getProduction(b.production.base, b.production.factor, b.level, 'karma', currentPlanet.temperature, percent) * energyBonus;
         }
         if (b.energyType === 'consumer' && b.consumption?.type === 'karma') {
-          consumedKarma += getConsumption(b.consumption.base, b.consumption.factor, b.level);
+          consumedKarma += getConsumption(b.consumption.base, b.consumption.factor, b.level, percent);
         }
       });
       
@@ -142,13 +158,16 @@ const App = () => {
 
         buildings.forEach(b => {
           if (b.level > 0 && b.production) {
-            const amount = getProduction(b.production.base, b.production.factor, b.level, b.production.type, currentPlanet.temperature) * deltaSeconds * efficiency;
-            if (b.production.type === 'risitasium') newRis += amount;
-            if (b.production.type === 'stickers') newSti += amount;
-            if (b.production.type === 'sel') newSel += amount;
+            const percent = b.percentage || 100;
+            const amount = getProduction(b.production.base, b.production.factor, b.level, b.production.type, currentPlanet.temperature, percent) * deltaSeconds * efficiency;
+            
+            if (b.production.type === 'risitasium') newRis = Math.min(maxRis, newRis + amount);
+            if (b.production.type === 'stickers') newSti = Math.min(maxSti, newSti + amount);
+            if (b.production.type === 'sel') newSel = Math.min(maxSel, newSel + amount);
           }
         });
 
+        // Add Storage Caps to state for UI
         return {
           ...prev,
           risitasium: newRis,
@@ -156,8 +175,11 @@ const App = () => {
           sel: newSel,
           karma: newKarma,
           karmaMax: producedKarma,
-          redpills: prev.redpills // Keep global
-        };
+          redpills: prev.redpills,
+          maxRis, // Pass caps for UI
+          maxSti,
+          maxSel
+        } as any; // TS bypass for dynamic properties
       });
 
       // --- CONSTRUCTION QUEUE ---
@@ -394,12 +416,15 @@ const App = () => {
         return;
     }
 
+    // Get Robotics Factory Level for speed
+    const roboticsLevel = buildings.find(b => b.id === 'usine_golems')?.level || 0;
+
     const inQueue = constructionQueue.find(item => item.id === buildingId);
     const levelToBuild = inQueue ? inQueue.targetLevel + 1 : b.level + 1;
     const risCost = getCost(b.baseCost.risitasium, b.costFactor, levelToBuild - 1);
     const stiCost = getCost(b.baseCost.stickers, b.costFactor, levelToBuild - 1);
     const selCost = getCost(b.baseCost.sel, b.costFactor, levelToBuild - 1);
-    const time = getConstructionTime(risCost, stiCost);
+    const time = getConstructionTime(risCost, stiCost, roboticsLevel);
 
     if (resources.risitasium >= risCost && resources.stickers >= stiCost && resources.sel >= selCost) {
       setResources(prev => prev ? ({ ...prev, risitasium: prev.risitasium - risCost, stickers: prev.stickers - stiCost, sel: prev.sel - selCost }) : null);
@@ -425,12 +450,15 @@ const App = () => {
     const t = research.find(x => x.id === techId);
     if (!t) return;
     
+    // Lab Research Speed handled differently? For now use same formula
+    const roboticsLevel = buildings.find(b => b.id === 'laboratoire_recherche')?.level || 0;
+
     const inQueue = constructionQueue.find(item => item.id === techId);
     const levelToBuild = inQueue ? inQueue.targetLevel + 1 : t.level + 1;
     const risCost = getCost(t.baseCost.risitasium, t.costFactor, levelToBuild - 1);
     const stiCost = getCost(t.baseCost.stickers, t.costFactor, levelToBuild - 1);
     const selCost = getCost(t.baseCost.sel, t.costFactor, levelToBuild - 1);
-    const time = getConstructionTime(risCost, stiCost);
+    const time = getConstructionTime(risCost, stiCost, roboticsLevel); // Lab level speeds up research
 
     if (resources.risitasium >= risCost && resources.stickers >= stiCost && resources.sel >= selCost) {
       setResources(prev => prev ? ({ ...prev, risitasium: prev.risitasium - risCost, stickers: prev.stickers - stiCost, sel: prev.sel - selCost }) : null);
@@ -509,6 +537,10 @@ const App = () => {
       setReports(prev => prev.map(r => r.id === id ? {...r, read: true} : r));
   };
 
+  const handleUpdatePercent = (id: string, percent: number) => {
+      setBuildings(prev => prev.map(b => b.id === id ? { ...b, percentage: percent } : b));
+  };
+
   const handleLogout = () => {
       syncToBackend();
       api.logout();
@@ -523,13 +555,16 @@ const App = () => {
   const renderContent = () => {
     if (detailBuilding) {
       const currentB = buildings.find(b => b.id === detailBuilding.id) || detailBuilding;
-      return <BuildingDetail building={currentB} onBack={() => setDetailBuilding(null)} currentResources={resources} />;
+      // Find Robotics Level for display calculation in detail
+      const roboticsLevel = buildings.find(b => b.id === 'usine_golems')?.level || 0;
+      return <BuildingDetail building={currentB} onBack={() => setDetailBuilding(null)} currentResources={resources} roboticsLevel={roboticsLevel} />;
     }
 
     switch(tab) {
       case 'overview': return <Overview resources={resources} planetName={currentUser.planets.find(p => p.id === currentUser.currentPlanetId)?.name || 'Colonie'} onRename={handleRenamePlanet} user={currentUser} />;
       case 'buildings': return <Buildings buildings={buildings} resources={resources} onBuild={handleBuild} onShowDetail={setDetailBuilding} />;
       case 'techtree': return <TechTreeView buildings={buildings} research={research} fleet={fleet} />;
+      case 'resources': return <ResourceSettingsView buildings={buildings} resources={resources} user={currentUser} onUpdatePercent={handleUpdatePercent} />;
       case 'research': return <ResearchView research={research} buildings={buildings} resources={resources} onResearch={handleResearch} />;
       case 'shipyard': return <ShipyardView fleet={fleet} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(fleet, setFleet, id, c)} />;
       case 'defense': return <DefenseView defenses={defenses} buildings={buildings} research={research} resources={resources} onBuild={(id, c) => handleUnitBuild(defenses, setDefenses, id, c)} />;

@@ -2,26 +2,37 @@
 import React from 'react';
 import { LucideArrowLeft, LucideZap, LucidePickaxe, LucideActivity } from 'lucide-react';
 import { Building, Resources } from '../types';
-import { getCost, getConstructionTime, getProduction, getConsumption, formatNumber, formatTime } from '../utils';
+import { getCost, getConstructionTime, getProduction, getConsumption, formatNumber, formatTime, getStorageCapacity } from '../utils';
 import { TechCard } from '../components/TechCard';
 
-export const BuildingDetail = ({ building, onBack, currentResources }: { building: Building, onBack: () => void, currentResources: Resources }) => {
+export const BuildingDetail = ({ building, onBack, currentResources, roboticsLevel }: { building: Building, onBack: () => void, currentResources: Resources, roboticsLevel: number }) => {
   const levels = [];
   const isResourceProducer = building.energyType === 'consumer' && building.production;
+  const isStorage = building.id.startsWith('hangar_') || building.id === 'reservoir_sel';
 
   for (let i = 1; i <= 10; i++) {
     const lvl = building.level + i;
     const risCost = getCost(building.baseCost.risitasium, building.costFactor, lvl);
     const stiCost = getCost(building.baseCost.stickers, building.costFactor, lvl);
-    const time = getConstructionTime(risCost, stiCost);
+    const time = getConstructionTime(risCost, stiCost, roboticsLevel);
     
     let prod = 0;
+    let prodLabel = "";
+
     if (building.production) {
       prod = getProduction(building.production.base, building.production.factor, lvl, building.production.type);
+      prodLabel = building.production.type === 'karma' ? 'Prod. Énergie' : 'Rendement / h';
     }
+    
+    if (isStorage) {
+        prod = getStorageCapacity(lvl);
+        prodLabel = 'Capacité Max';
+    }
+
     let cons = 0;
     if (building.consumption) cons = getConsumption(building.consumption.base, building.consumption.factor, lvl);
-    levels.push({ lvl, prod, cons, time });
+    
+    levels.push({ lvl, prod, cons, time, prodLabel });
   }
 
   return (
@@ -64,9 +75,7 @@ export const BuildingDetail = ({ building, onBack, currentResources }: { buildin
               <tr>
                 <th className="px-6 py-4">Niveau</th>
                 <th className="px-6 py-4 text-right">
-                  {building.production?.type === 'karma' 
-                    ? 'Production Énergie' 
-                    : (isResourceProducer ? 'Rendement / Heure' : 'Gain')}
+                  {levels[0]?.prodLabel || 'Gain'}
                 </th>
                 <th className="px-6 py-4 text-right">
                   {building.consumption?.type === 'karma' ? 'Conso. Énergie' : 'Consommation'}
@@ -79,8 +88,8 @@ export const BuildingDetail = ({ building, onBack, currentResources }: { buildin
                 <tr key={row.lvl} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 font-bold text-tech-blue">LVL {row.lvl}</td>
                   <td className="px-6 py-4 text-right text-green-400 font-bold">
-                    {building.production 
-                      ? `+${formatNumber(isResourceProducer ? row.prod * 3600 : row.prod)}` 
+                    {(building.production || isStorage)
+                      ? (isStorage ? formatNumber(row.prod) : `+${formatNumber(isResourceProducer ? row.prod * 3600 : row.prod)}`)
                       : <span className="text-slate-700">-</span>}
                   </td>
                   <td className="px-6 py-4 text-right text-red-400">

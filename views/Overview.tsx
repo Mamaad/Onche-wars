@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { LucideGlobe, LucideActivity, LucideShield, LucideEdit2, LucideCheck, LucideMaximize2, LucideThermometer } from 'lucide-react';
 import { Resources, User } from '../types'; // Import User
@@ -71,7 +72,7 @@ export const Overview = ({ resources, planetName, onRename, user }: { resources:
           <ul className="space-y-3 text-slate-300 text-sm font-mono">
              <li className="flex justify-between border-b border-slate-800 pb-1">
                  <span className="text-slate-500">Diamètre</span>
-                 <span className="text-white font-bold">12,800 km</span>
+                 <span className="text-white font-bold">12 800 km</span>
              </li>
              <li className="flex justify-between border-b border-slate-800 pb-1">
                  <span className="text-slate-500 flex items-center gap-2"><LucideThermometer size={14}/> Température</span>

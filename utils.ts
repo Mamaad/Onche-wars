@@ -3,55 +3,55 @@ import { ResourceType, Ship, Defense, User, PointsBreakdown, Building, Research,
 import { BUILDING_DB, RESEARCH_DB, SHIP_DB, DEFENSE_DB, RAPID_FIRE } from './constants';
 
 export const formatNumber = (num: number) => {
-  if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
-  if (num >= 1000) return (num / 1000).toFixed(0) + 'k';
-  return Math.floor(num).toString();
+  // Format: 1 000 000 (Espaces, pas de virgules, pas de décimales)
+  return Math.floor(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 };
 
 export const getCost = (base: number, factor: number, level: number) => {
   return Math.floor(base * Math.pow(factor, level));
 };
 
-export const getProduction = (base: number, factor: number, level: number, type?: ResourceType, temperature?: { min: number, max: number }) => {
+export const getProduction = (base: number, factor: number, level: number, type?: ResourceType, temperature?: { min: number, max: number }, percentage: number = 100) => {
   const raw = base * level * Math.pow(factor, level);
+  const ratio = percentage / 100;
   
   // Temperature Logic
   if (temperature) {
       const avgTemp = (temperature.min + temperature.max) / 2;
       
-      // Solar Plant: Better if hot
-      // Formula: Base * (1 + (AvgTemp / 100)) - simplified approximation needed?
-      // OGame: floor(30 * Level * (1.1 ^ Level) * (1 + AverageTemp / 200)) ? No standard is floor(20 * Level * 1.1^Level)
-      // Let's apply a bonus/malus based on temp for specific types
-      
       if (type === 'karma') {
-          // Solar energy bonus up to +50% at 100°C, -50% at -100°C
+          // Solar energy bonus up to +50% at 100°C
           const tempBonus = 1 + (avgTemp / 200);
-          return Math.floor(raw * Math.max(0.1, tempBonus));
+          return Math.floor(raw * Math.max(0.1, tempBonus) * ratio); // Apply ratio here
       }
       
       if (type === 'sel') {
-          // Deut (Sel) consumption/production affected by temp?
-          // OGame: Deut synth produces MORE in COLD planets.
-          // Formula: Base * Level * 1.1^Level * (1.44 - 0.004 * MaxTemp)
+          // Deut (Sel) consumption/production affected by temp
           const tempFactor = 1.44 - 0.004 * temperature.max;
-          // But here we use 'raw' as input which already has base*lvl*factor. 
-          // So we adjust raw.
-          // Since our base formula is simpler, let's just add a modifier.
-          return Math.floor(raw * Math.max(0.1, tempFactor));
+          // CRITICAL FIX: Applied 0.06 speed factor to Salt as well
+          return Math.floor(raw * Math.max(0.1, tempFactor) * 0.06 * ratio);
       }
   }
 
-  if (type === 'karma') return Math.floor(raw);
-  return Math.floor(raw * 0.06); // Global Speed Factor
+  if (type === 'karma') return Math.floor(raw * ratio);
+  return Math.floor(raw * 0.06 * ratio); // Global Speed Factor
 };
 
-export const getConsumption = (base: number, factor: number, level: number) => {
-  return Math.floor(base * level * Math.pow(factor, level));
+export const getConsumption = (base: number, factor: number, level: number, percentage: number = 100) => {
+  return Math.floor(base * level * Math.pow(factor, level) * (percentage / 100));
 };
 
-export const getConstructionTime = (costRis: number, costSti: number) => {
-  const seconds = (costRis + costSti) / 2500;
+export const getStorageCapacity = (level: number) => {
+    // Base 50k for level 1, then exponential
+    // Formula: 50000 * 1.6 ^ (level - 1)
+    if (level === 0) return 10000; // Base planet storage
+    return Math.floor(50000 * Math.pow(1.6, level - 1));
+};
+
+export const getConstructionTime = (costRis: number, costSti: number, roboticsLevel: number = 0) => {
+  // Base Speed 5x slower than before (divisor 2500 -> 500)
+  // Divided by (Robotics Level + 1)
+  const seconds = ((costRis + costSti) / 500) * (1 / (roboticsLevel + 1));
   return seconds < 1 ? 1 : Math.round(seconds);
 };
 

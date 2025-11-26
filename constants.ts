@@ -180,6 +180,7 @@ export const BUILDING_DB: Building[] = [
     energyType: 'consumer',
     consumption: { type: 'karma', base: 10, factor: 1.1 },
     image: 'https://images.unsplash.com/photo-1516937941344-00b4ec0c4663?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'extracteur_stickers',
@@ -194,6 +195,7 @@ export const BUILDING_DB: Building[] = [
     energyType: 'consumer',
     consumption: { type: 'karma', base: 10, factor: 1.1 },
     image: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'raffineur_sel',
@@ -208,6 +210,7 @@ export const BUILDING_DB: Building[] = [
     energyType: 'consumer',
     consumption: { type: 'karma', base: 20, factor: 1.1 },
     image: 'https://images.unsplash.com/photo-1518337231011-7b24300e84b6?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'centrale_solaire',
@@ -221,6 +224,7 @@ export const BUILDING_DB: Building[] = [
     production: { type: 'karma', base: 20, factor: 1.1 },
     energyType: 'producer',
     image: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'centrale_fusion',
@@ -235,19 +239,61 @@ export const BUILDING_DB: Building[] = [
     energyType: 'producer',
     consumption: { type: 'sel', base: 5, factor: 1.1 },
     image: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
+  },
+  {
+    id: 'hangar_risitasium',
+    name: 'Hangar de Risitium',
+    description: 'Augmente la capacité de stockage du Risitium.',
+    longDescription: 'Un immense entrepôt blindé permettant de stocker le minerai brut à l\'abri des intempéries et des pillards.',
+    level: 0,
+    baseCost: { risitasium: 1000, stickers: 0, sel: 0 },
+    costFactor: 2,
+    basePoints: 5,
+    energyType: 'consumer',
+    // No energy consumption for simple storage
+    image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
+  },
+  {
+    id: 'hangar_stickers',
+    name: 'Hangar de Stickers',
+    description: 'Augmente la capacité de stockage des Stickers.',
+    longDescription: 'Un serveur de données ultra-sécurisé et refroidi pour stocker des pétaoctets de mèmes cristallisés.',
+    level: 0,
+    baseCost: { risitasium: 1000, stickers: 500, sel: 0 },
+    costFactor: 2,
+    basePoints: 5,
+    energyType: 'consumer',
+    image: 'https://images.unsplash.com/photo-1558494949-ef526b0042a0?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
+  },
+  {
+    id: 'reservoir_sel',
+    name: 'Réservoir de Sel',
+    description: 'Augmente la capacité de stockage du Sel.',
+    longDescription: 'Cuves pressurisées et blindées au plomb pour contenir les isotopes toxiques du Sel.',
+    level: 0,
+    baseCost: { risitasium: 1000, stickers: 1000, sel: 0 },
+    costFactor: 2,
+    basePoints: 5,
+    energyType: 'consumer',
+    image: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'usine_golems',
     name: 'Usine de Golems',
-    description: 'Chaîne de montage d\'ouvriers.',
+    description: 'Réduit le temps de construction des bâtiments.',
     longDescription: 'Une chaîne de montage automatisée qui produit des ouvriers incatigables. Chaque niveau optimise la logistique et réduit drastiquement les temps de construction.',
     level: 0,
     baseCost: { risitasium: 400, stickers: 120, sel: 200 },
     costFactor: 2,
     basePoints: 10,
     energyType: 'consumer',
-    consumption: { type: 'karma', base: 10, factor: 1.1 },
+    // Removed consumption
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'laboratoire_recherche',
@@ -255,12 +301,13 @@ export const BUILDING_DB: Building[] = [
     description: 'Centre de développement technologique.',
     longDescription: 'Le centre névralgique de l\'intelligence de votre empire. Ici, les savants étudient les mystères du Risitium et du Sel pour développer de nouveaux moteurs.',
     level: 0,
-    baseCost: { risitasium: 200, stickers: 400, sel: 200 },
+    baseCost: { risitasium: 1000, stickers: 2000, sel: 1000 }, // Increased cost
     costFactor: 2,
     basePoints: 10,
     energyType: 'consumer',
-    consumption: { type: 'karma', base: 10, factor: 1.1 },
+    // Removed consumption
     image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'chantier_spatial',
@@ -268,13 +315,14 @@ export const BUILDING_DB: Building[] = [
     description: 'Dock d\'assemblage de flotte.',
     longDescription: 'Un immense dock orbital capable d\'assembler des coques en alliage de Risitium. Nécessaire pour construire aussi bien des transporteurs civils que des croiseurs de bataille.',
     level: 0,
-    baseCost: { risitasium: 400, stickers: 200, sel: 100 },
+    baseCost: { risitasium: 2000, stickers: 1000, sel: 500 }, // Increased cost
     costFactor: 2,
     basePoints: 10,
     energyType: 'consumer',
-    consumption: { type: 'karma', base: 0, factor: 1 },
+    // Removed consumption
     reqs: { 'usine_golems': 2 },
     image: 'https://images.unsplash.com/photo-1614728853970-309140b774cf?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'silo_missiles',
@@ -286,9 +334,10 @@ export const BUILDING_DB: Building[] = [
     costFactor: 2,
     basePoints: 20,
     energyType: 'consumer',
-    consumption: { type: 'karma', base: 0, factor: 1 },
+    // Removed consumption
     reqs: { 'chantier_spatial': 1 },
     image: 'https://images.unsplash.com/photo-1517411032315-54ef2cb00966?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   },
   {
     id: 'phalange_capteur',
@@ -300,9 +349,10 @@ export const BUILDING_DB: Building[] = [
     costFactor: 2,
     basePoints: 50,
     energyType: 'consumer',
-    consumption: { type: 'karma', base: 100, factor: 1.5 },
-    reqs: { 'laboratoire_recherche': 10, 'tech_energie': 10 }, // Normalement sur Lune, ici simplifié
+    consumption: { type: 'karma', base: 1000, factor: 1.5 }, // Phalanx still consumes energy
+    reqs: { 'laboratoire_recherche': 10, 'tech_energie': 10 }, 
     image: 'https://images.unsplash.com/photo-1614728263952-84ea2563bc10?q=80&w=500&auto=format&fit=crop',
+    percentage: 100,
   }
 ];
 

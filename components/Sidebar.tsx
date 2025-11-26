@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull, LucideChevronDown } from 'lucide-react';
+import { LucideGlobe, LucidePickaxe, LucideAtom, LucideRocket, LucideCrosshair, LucideMessageSquare, LucideX, LucideMenu, LucideActivity, LucideNetwork, LucideShield, LucideUser, LucideGamepad2, LucideHelpCircle, LucideTrophy, LucideHandshake, LucideBriefcase, LucideSkull, LucideChevronDown, LucideSettings2 } from 'lucide-react';
 import { TechCard } from './TechCard';
 import { Building, ConstructionItem, User } from '../types';
 import { formatTime } from '../utils';
@@ -32,6 +32,7 @@ export const Sidebar = ({ activeTab, setTab, isMobileOpen, setMobileOpen, buildi
     { id: 'merchant', label: 'MARCHÉ NOIR', icon: <LucideBriefcase />, visible: true },
     { id: 'highscore', label: 'CLASSEMENT', icon: <LucideTrophy />, visible: true },
     { id: 'techtree', label: 'ARBRE TECH', icon: <LucideNetwork />, visible: true },
+    { id: 'resources', label: 'RÉCAPITULATIF', icon: <LucideSettings2 />, visible: true },
     { id: 'simulator', label: 'SIMULATEUR', icon: <LucideGamepad2 />, visible: true },
     { id: 'messages', label: 'MESSAGERIE', icon: <LucideMessageSquare />, visible: true },
     { id: 'admin', label: 'ADMINISTRATION', icon: <LucideSkull />, visible: user.isAdmin },

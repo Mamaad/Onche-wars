@@ -1,17 +1,19 @@
 import React from 'react';
 
-export const TechCard = ({ 
+interface TechCardProps {
+  children?: React.ReactNode;
+  className?: string;
+  onClick?: (e?: any) => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+}
+
+export const TechCard: React.FC<TechCardProps> = ({ 
   children, 
   className = "", 
   onClick, 
   onMouseEnter, 
   onMouseLeave 
-}: { 
-  children?: React.ReactNode, 
-  className?: string, 
-  onClick?: (e?: any) => void,
-  onMouseEnter?: () => void,
-  onMouseLeave?: () => void 
 }) => (
   <div 
     onClick={onClick}

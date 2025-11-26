@@ -38,6 +38,7 @@ export interface Building extends Entity {
   consumption?: { type: ResourceType; base: number; factor: number };
   energyType?: 'consumer' | 'producer';
   reqsArray?: string[];
+  percentage: number; // 0 to 100
 }
 
 export interface Research extends Entity {
