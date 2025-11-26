@@ -14,7 +14,9 @@ export const BuildingDetail = ({ building, onBack, currentResources, roboticsLev
     const lvl = building.level + i;
     const risCost = getCost(building.baseCost.risitasium, building.costFactor, lvl);
     const stiCost = getCost(building.baseCost.stickers, building.costFactor, lvl);
-    const time = getConstructionTime(risCost, stiCost, roboticsLevel);
+    
+    // New Time Calculation
+    const time = getConstructionTime(building.baseTime || 60, building.timeFactor || 1.5, lvl, roboticsLevel);
     
     let prod = 0;
     let prodLabel = "";

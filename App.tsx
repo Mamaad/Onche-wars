@@ -424,7 +424,9 @@ const App = () => {
     const risCost = getCost(b.baseCost.risitasium, b.costFactor, levelToBuild - 1);
     const stiCost = getCost(b.baseCost.stickers, b.costFactor, levelToBuild - 1);
     const selCost = getCost(b.baseCost.sel, b.costFactor, levelToBuild - 1);
-    const time = getConstructionTime(risCost, stiCost, roboticsLevel);
+    
+    // New Time Calculation
+    const time = getConstructionTime(b.baseTime || 60, b.timeFactor || 1.5, levelToBuild, roboticsLevel);
 
     if (resources.risitasium >= risCost && resources.stickers >= stiCost && resources.sel >= selCost) {
       setResources(prev => prev ? ({ ...prev, risitasium: prev.risitasium - risCost, stickers: prev.stickers - stiCost, sel: prev.sel - selCost }) : null);
@@ -450,7 +452,7 @@ const App = () => {
     const t = research.find(x => x.id === techId);
     if (!t) return;
     
-    // Lab Research Speed handled differently? For now use same formula
+    // Lab Research Speed
     const roboticsLevel = buildings.find(b => b.id === 'laboratoire_recherche')?.level || 0;
 
     const inQueue = constructionQueue.find(item => item.id === techId);
@@ -458,7 +460,9 @@ const App = () => {
     const risCost = getCost(t.baseCost.risitasium, t.costFactor, levelToBuild - 1);
     const stiCost = getCost(t.baseCost.stickers, t.costFactor, levelToBuild - 1);
     const selCost = getCost(t.baseCost.sel, t.costFactor, levelToBuild - 1);
-    const time = getConstructionTime(risCost, stiCost, roboticsLevel); // Lab level speeds up research
+    
+    // New Time Calculation for Research
+    const time = getConstructionTime(t.baseTime || 100, t.timeFactor || 1.5, levelToBuild, roboticsLevel); 
 
     if (resources.risitasium >= risCost && resources.stickers >= stiCost && resources.sel >= selCost) {
       setResources(prev => prev ? ({ ...prev, risitasium: prev.risitasium - risCost, stickers: prev.stickers - stiCost, sel: prev.sel - selCost }) : null);

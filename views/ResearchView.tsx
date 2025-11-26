@@ -33,7 +33,9 @@ export const ResearchView = ({ research, buildings, resources, onResearch }: { r
           const risCost = getCost(t.baseCost.risitasium, t.costFactor, t.level);
           const stiCost = getCost(t.baseCost.stickers, t.costFactor, t.level);
           const selCost = getCost(t.baseCost.sel, t.costFactor, t.level);
-          const constructionTime = getConstructionTime(risCost, stiCost);
+          
+          // New Time Calculation
+          const constructionTime = getConstructionTime(t.baseTime || 100, t.timeFactor || 1.5, t.level + 1, labLevel);
 
           const canAfford = 
             resources.risitasium >= risCost && 

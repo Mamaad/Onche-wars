@@ -23,8 +23,9 @@ export const Buildings = ({ buildings, resources, onBuild, onShowDetail }: any) 
           const risCost = getCost(b.baseCost.risitasium, b.costFactor, b.level);
           const stiCost = getCost(b.baseCost.stickers, b.costFactor, b.level);
           const selCost = getCost(b.baseCost.sel, b.costFactor, b.level);
-          // Pass roboticsLevel here
-          const constructionTime = getConstructionTime(risCost, stiCost, roboticsLevel);
+          
+          // New Time Calculation
+          const constructionTime = getConstructionTime(b.baseTime || 60, b.timeFactor || 1.5, b.level + 1, roboticsLevel);
 
           const canAfford = 
             resources.risitasium >= risCost && 

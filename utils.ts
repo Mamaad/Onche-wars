@@ -28,13 +28,16 @@ export const getProduction = (base: number, factor: number, level: number, type?
       if (type === 'sel') {
           // Deut (Sel) consumption/production affected by temp
           const tempFactor = 1.44 - 0.004 * temperature.max;
-          // CRITICAL FIX: Applied 0.06 speed factor to Salt as well
-          return Math.floor(raw * Math.max(0.1, tempFactor) * 0.06 * ratio);
+          // CRITICAL FIX: Applied speed factor to Salt as well
+          return Math.floor(raw * Math.max(0.1, tempFactor) * 0.09 * ratio);
       }
   }
 
   if (type === 'karma') return Math.floor(raw * ratio);
-  return Math.floor(raw * 0.06 * ratio); // Global Speed Factor
+  
+  // --- GLOBAL SPEED FACTOR ---
+  // C'est ici qu'on règle la vitesse de l'économie entière du jeu
+  return Math.floor(raw * 0.09 * ratio); 
 };
 
 export const getConsumption = (base: number, factor: number, level: number, percentage: number = 100) => {
@@ -42,23 +45,29 @@ export const getConsumption = (base: number, factor: number, level: number, perc
 };
 
 export const getStorageCapacity = (level: number) => {
-    // Base 50k for level 1, then exponential
-    // Formula: 50000 * 1.6 ^ (level - 1)
+    // Base 100k for level 1
+    // Formula: 100000 * 3 ^ (level - 1) (Triple per level)
     if (level === 0) return 10000; // Base planet storage
-    return Math.floor(50000 * Math.pow(1.6, level - 1));
+    return Math.floor(100000 * Math.pow(3, level - 1));
 };
 
-export const getConstructionTime = (costRis: number, costSti: number, roboticsLevel: number = 0) => {
-  // Base Speed 5x slower than before (divisor 2500 -> 500)
-  // Divided by (Robotics Level + 1)
-  const seconds = ((costRis + costSti) / 500) * (1 / (roboticsLevel + 1));
+export const getConstructionTime = (baseTime: number, timeFactor: number, targetLevel: number, roboticsLevel: number = 0) => {
+  // New Logic: Decoupled from cost.
+  // Time = BaseTime * (TimeFactor ^ (Level - 1))
+  // Speedup: / (Robotics + 1)
+  
+  const levelIndex = Math.max(0, targetLevel - 1);
+  const rawSeconds = baseTime * Math.pow(timeFactor, levelIndex);
+  const seconds = rawSeconds * (1 / (roboticsLevel + 1));
+  
   return seconds < 1 ? 1 : Math.round(seconds);
 };
 
 export const formatTime = (seconds: number) => {
   if (seconds < 60) return `${Math.floor(seconds)}s`;
   if (seconds < 3600) return `${Math.floor(seconds/60)}m ${Math.floor(seconds%60)}s`;
-  return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m`;
+  return `${Math.floor(seconds/86400)}j ${Math.floor((seconds%86400)/3600)}h`;
 };
 
 // --- POINTS CALCULATION ---

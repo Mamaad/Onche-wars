@@ -30,6 +30,9 @@ export interface Entity {
   basePoints: number;
   reqs?: Requirement;
   image?: string;
+  // New Time Calculation props
+  baseTime?: number; // Seconds for Level 1
+  timeFactor?: number; // Multiplier per level
 }
 
 export interface Building extends Entity {
