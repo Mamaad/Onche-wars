@@ -1,3 +1,4 @@
+
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -15,10 +16,10 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }) as any);
 
 // --- STATIC FILES (Frontend) ---
-// En prod, le script place le build frontend dans /var/www/onchewars/dist
-// Le build backend est dans /var/www/onchewars/server/dist
-// Donc on doit remonter de 2 niveaux : ../../dist
-app.use(express.static(path.join(__dirname, '../../dist')) as any);
+// Structure sur le serveur :
+// /var/www/onchewars/server/dist/index.js (Nous sommes ici)
+// /var/www/onchewars/client/dist/index.html (Le frontend est ici)
+app.use(express.static(path.join(__dirname, '../../client/dist')) as any);
 
 AppDataSource.initialize().then(async () => {
     console.log("Database connected.");
@@ -135,9 +136,8 @@ AppDataSource.initialize().then(async () => {
     app.get("/api/chat", (req, res) => res.json([]));
 
     // React Routing (SPA)
-    // Redirige toutes les autres requêtes vers index.html du frontend
     app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, '../../dist/index.html'));
+        res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
     });
 
     app.listen(PORT, "0.0.0.0", () => {
