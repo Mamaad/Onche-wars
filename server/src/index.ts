@@ -1,4 +1,3 @@
-
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -13,11 +12,13 @@ const app = express();
 const PORT = 1000;
 
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increased limit for game state sync
+app.use(express.json({ limit: '50mb' }) as any);
 
 // --- STATIC FILES (Frontend) ---
-// On sert le dossier 'client/dist' construit par Vite
-app.use(express.static(path.join(__dirname, '../../../client/dist')));
+// En prod, le script place le build frontend dans /var/www/onchewars/dist
+// Le build backend est dans /var/www/onchewars/server/dist
+// Donc on doit remonter de 2 niveaux : ../../dist
+app.use(express.static(path.join(__dirname, '../../dist')) as any);
 
 AppDataSource.initialize().then(async () => {
     console.log("Database connected.");
@@ -41,8 +42,8 @@ AppDataSource.initialize().then(async () => {
         
         // Init Game State
         newUser.planets = [initialPlanet];
-        newUser.currentPlanetId = initialPlanet.id; // Hack: add to json via any
-        newUser.research = []; // TODO: Load default DB
+        newUser.currentPlanetId = initialPlanet.id; 
+        newUser.research = []; 
         newUser.officers = [];
         newUser.missions = [];
         newUser.reports = [];
@@ -53,7 +54,6 @@ AppDataSource.initialize().then(async () => {
 
         await userRepo.save(newUser);
         
-        // Return user with ID but without password
         const { password: _, ...userNoPass } = newUser;
         res.json({ success: true, user: { ...userNoPass, id: newUser.id }, token: newUser.id });
     });
@@ -71,7 +71,7 @@ AppDataSource.initialize().then(async () => {
         res.json({ success: true, user: { ...userNoPass, id: user.id }, token: user.id });
     });
 
-    // Get State (Session Resume)
+    // Get State
     app.get("/api/game/state", async (req, res) => {
         const id = req.headers['authorization'];
         if (!id) return res.status(401).send();
@@ -80,13 +80,12 @@ AppDataSource.initialize().then(async () => {
         if (!user) return res.status(404).send();
 
         const { password: _, ...userNoPass } = user;
-        // Fix: Ensure basic arrays exist if JSON was null
         if(!userNoPass.planets) userNoPass.planets = [];
         
         res.json({ user: { ...userNoPass, currentPlanetId: userNoPass.planets[0]?.id } });
     });
 
-    // Save State (Sync)
+    // Save State
     app.post("/api/game/sync", async (req, res) => {
         const id = req.headers['authorization'];
         if (!id) return res.status(401).send();
@@ -94,12 +93,9 @@ AppDataSource.initialize().then(async () => {
         const user = await userRepo.findOneBy({ id });
         if (!user) return res.status(404).send();
 
-        // Update fields from body
-        // SECURITY WARNING: In V2, verify logic here instead of blindly saving
         const body = req.body;
-        
         user.planets = body.planets;
-        user.resources = body.resources; // Note: resources usually inside planets
+        user.resources = body.resources;
         user.research = body.research;
         user.fleet = body.fleet;
         user.defenses = body.defenses;
@@ -128,20 +124,20 @@ AppDataSource.initialize().then(async () => {
             select: ["id", "username", "points", "allianceId", "isAdmin"],
             take: 100
         });
-        // Sort logic needs to handle JSON extraction or be done in JS for now
         users.sort((a, b) => (b.points?.total || 0) - (a.points?.total || 0));
         res.json(users);
     });
 
-    // Fallback Galaxy Data (Mock for now)
+    // Fallbacks
     app.get("/api/galaxy", (req, res) => res.json({}));
     app.get("/api/alliance", (req, res) => res.json([]));
     app.get("/api/market", (req, res) => res.json([]));
     app.get("/api/chat", (req, res) => res.json([]));
 
-    // Handle React Routing
+    // React Routing (SPA)
+    // Redirige toutes les autres requêtes vers index.html du frontend
     app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, '../../../client/dist/index.html'));
+        res.sendFile(path.join(__dirname, '../../dist/index.html'));
     });
 
     app.listen(PORT, "0.0.0.0", () => {

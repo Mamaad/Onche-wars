@@ -10,9 +10,9 @@ export const AppDataSource = new DataSource({
     username: "onchewars_user",
     password: "Onchewars94,",
     database: "onchewars_db",
-    synchronize: true, // AUTO-MIGRATION (Utile pour le dev/MVP)
+    synchronize: true, // IMPORTANT: Garder à true pour que les tables se créent automatiquement
     logging: false,
-    entities: [User], // Ajout des entités ici
+    entities: [User],
     subscribers: [],
     migrations: [],
 });
