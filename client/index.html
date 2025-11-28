@@ -1,0 +1,197 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Onche Wars</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Orbitron (Titres) et Rajdhani (UI/Data) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;600;700&family=VT323&display=swap" rel="stylesheet">
+
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "url": "https://aistudiocdn.com/url@^0.11.4",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "reflect-metadata": "https://aistudiocdn.com/reflect-metadata@^0.2.2",
+    "typeorm": "https://aistudiocdn.com/typeorm@^0.3.27"
+  }
+}
+</script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Rajdhani', 'sans-serif'],
+            display: ['Orbitron', 'sans-serif'],
+            retro: ['VT323', 'monospace'],
+          },
+          colors: {
+            'space-black': '#050b14',
+            'tech-gold': '#fbbf24',
+            'tech-blue': '#0ea5e9',
+            'tech-dark': '#0f172a',
+          },
+          backgroundImage: {
+            'grid-pattern': "linear-gradient(to right, #1e293b 1px, transparent 1px), linear-gradient(to bottom, #1e293b 1px, transparent 1px)",
+            'radial-glow': "radial-gradient(circle at center, rgba(14, 165, 233, 0.15) 0%, transparent 70%)"
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'scanline': 'scanline 8s linear infinite',
+          },
+          keyframes: {
+            scanline: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(100%)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #020408;
+      background-image: 
+        radial-gradient(circle at 50% 0%, #1e293b 0%, transparent 70%),
+        radial-gradient(circle at 80% 80%, #1e1b4b 0%, transparent 50%);
+      color: #e2e8f0;
+      transition: all 0.5s ease;
+    }
+
+    /* Scrollbar personnalisée style Cyberpunk */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 0px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #fbbf24;
+    }
+
+    /* Effet Scanline subtil */
+    .scanlines::before {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      z-index: 9999;
+      background-size: 100% 2px, 3px 100%;
+      pointer-events: none;
+    }
+    
+    /* Text Glow */
+    .text-glow {
+      text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+    }
+    .text-glow-blue {
+      text-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+    }
+
+    /* Animations de chargement */
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* --- THEMES --- */
+
+    /* RETRO (Matrix/Terminal) */
+    body.theme-retro {
+      background-color: #000000 !important;
+      background-image: linear-gradient(0deg, transparent 24%, rgba(0, 255, 0, .05) 25%, rgba(0, 255, 0, .05) 26%, transparent 27%, transparent 74%, rgba(0, 255, 0, .05) 75%, rgba(0, 255, 0, .05) 76%, transparent 77%, transparent) !important;
+      background-size: 50px 50px !important;
+      color: #33ff33 !important;
+      font-family: 'VT323', monospace !important;
+    }
+    body.theme-retro * {
+      border-radius: 0 !important;
+      font-family: 'VT323', monospace !important;
+    }
+    body.theme-retro .bg-space-black, 
+    body.theme-retro .bg-slate-900, 
+    body.theme-retro .bg-black {
+      background-color: #051a05 !important;
+      border-color: #33ff33 !important;
+    }
+    body.theme-retro .text-white, 
+    body.theme-retro .text-slate-300, 
+    body.theme-retro .text-slate-400, 
+    body.theme-retro .text-slate-500 {
+      color: #33ff33 !important;
+    }
+    body.theme-retro .text-tech-gold, 
+    body.theme-retro .text-tech-blue,
+    body.theme-retro .text-red-500,
+    body.theme-retro .text-green-400 {
+      color: #ccffcc !important;
+      text-shadow: 0 0 5px #33ff33;
+    }
+    body.theme-retro button {
+      border: 1px solid #33ff33 !important;
+      background: #000 !important;
+      color: #33ff33 !important;
+    }
+    body.theme-retro button:hover {
+      background: #33ff33 !important;
+      color: #000 !important;
+    }
+
+    /* NEON (Cyberpunk/Purple) */
+    body.theme-neon {
+      background-color: #0f001a !important;
+      background-image: 
+        radial-gradient(circle at 20% 20%, rgba(255, 0, 255, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.15) 0%, transparent 40%) !important;
+      color: #f0f0f0 !important;
+    }
+    body.theme-neon .text-tech-gold {
+      color: #ff00ff !important;
+      text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+    }
+    body.theme-neon .text-tech-blue {
+      color: #00ffff !important;
+      text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+    }
+    body.theme-neon .bg-slate-900, body.theme-neon .bg-space-black {
+      background-color: rgba(20, 0, 40, 0.9) !important;
+      border-color: #bd00ff !important;
+      box-shadow: 0 0 10px rgba(189, 0, 255, 0.2);
+    }
+    body.theme-neon button {
+      text-shadow: 0 0 5px currentColor;
+    }
+  </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="scanlines overflow-x-hidden">
+  <div id="root"></div>
+  <script type="module" src="index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
